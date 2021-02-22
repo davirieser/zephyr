@@ -1,0 +1,30 @@
+digraph finite_state_machine {
+	graph [ dpi=300 ];
+	rankdir=LR;
+	size="8,5"
+	node [shape = doublecircle]; INIT;
+	node [shape = circle];
+	INIT -> BUSY [ label = "RX=W /" ];
+	BUSY -> INIT [ label = "nach 10 Sekunden /"]
+	INIT -> AVAIL [ label = "RX=P /" ];
+	AVAIL -> INIT [ label = "/ TX=PROCESSING AVAILABLE" ];
+	
+	INIT -> KEY [ label = "RX=K / " ];
+	KEY -> DATA [ label = " / op=KEY,len=16" ];
+	DATA -> DATA [ label = "len !=0 && RX=? / len--" ];
+	DATA -> OP [ label = "len == 0 && RX=? /" ];
+	OP -> OP_KEY [ label = "op==KEY / key=RX-DATA" ];
+	OP_KEY -> INIT [ label = " / " ];
+	
+	INIT -> IV [ label = "RX=I / " ];
+	IV -> DATA [ label = " / op=IV,len=16" ];
+	OP -> OP_IV [ label = "op==IV / iv=RX-DATA" ];
+	OP_IV -> INIT [ label = " / " ];
+	
+	INIT -> DECRYPT [ label = "RX=D / " ];
+	DECRYPT -> DLEN [ label = "RX=? / op=DECRYPT,len=RX-DATA" ];
+	DLEN -> DATA [ label = " / " ];
+	OP -> OP_DECRYPT [ label = " op==DECRYPT / PLAINTEXT=decrypt(RX-DATA)" ];
+	OP_DECRYPT -> INIT [ label = " / TX=PAINTEXT"]
+
+}
