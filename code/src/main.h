@@ -11,6 +11,8 @@
 #include <drivers/uart.h>
 #include <crypto/cipher.h>
 #include <crypto/cipher_structs.h>
+#include <tinycrypt/cbc_mode.h>
+#include <tinycrypt/constants.h>
 #include <logging/log.h>
 #include <pthread.h>
 #include <posix/mqueue.h>
@@ -56,7 +58,6 @@ LOG_MODULE_REGISTER(main);
 #define PROCESSING_THREAD_BUSY 1
 
 void init_threads(pthread_t * threads);
-
 /* ----- UART SECTION ------------------------------------------------------- */
 void state_machine();
 void send_via_uart(unsigned char tx);

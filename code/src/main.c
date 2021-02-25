@@ -12,6 +12,15 @@ K_MSGQ_DEFINE(crypto_queue, sizeof(char *), QUEUE_LEN, QUEUE_TIMEOUT);
 const struct device * uart_dev;
 const struct device * crypto_dev;
 
+// Create UART_Config
+const struct uart_config uart_cfg = {
+		.baudrate = 115200,
+		.parity = UART_CFG_PARITY_NONE,
+		.stop_bits = UART_CFG_STOP_BITS_1,
+		.data_bits = UART_CFG_DATA_BITS_8,
+		.flow_ctrl = UART_CFG_FLOW_CTRL_NONE
+	};
+
 static unsigned char * g_in_buffer = "Schoene Crypto Welt             ";
 static unsigned char * g_out_buffer;
 static unsigned char g_iv[AES_IV_LEN] = {
@@ -29,6 +38,10 @@ void main(void) {
 	uart_dev = device_get_binding(UART_DRV_NAME);
 	if (!uart_dev) {
         LOG_ERR("%s pseudo device not found", UART_DRV_NAME);
+        return;
+    }
+    if(!uart_configure(uart_dev, &uart_cfg)) {
+        LOG_ERR("Error during UART-Config");
         return;
     }
 	crypto_dev = device_get_binding(CRYPTO_DRV_NAME);
