@@ -3,7 +3,8 @@
 cmake_minimum_required(VERSION 3.13.1)
 
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
-project(eventfd)
+project(CRYPTO_UART)
 
-#target_include_directories(app PRIVATE ${ZEPHYR_BASE}/include/posix)
-target_sources(app PRIVATE src/main.c)
+# Get all ".c"-Files in the src-Directory
+FILE(GLOB MyCSources src/*.c)
+target_sources(app PRIVATE ${MyCSources})

@@ -44,11 +44,11 @@ class MyTests(unittest.TestCase):
     def test_01_availibility(self):
         with serial.serial_for_url("spy://{}".format(self.SERDEV)) as ser:
             ser.reset_input_buffer()
-            ser.timeout = 5
+            ser.timeout = 1
 
             for i in range(0, 10):
                 ser.write(b'P')
-                reply = ser.read(100)
+                reply = ser.read(21)
                 self.assertEqual(reply, b"PROCESSING AVAILABLE\n")
 
     def test_02_blocking(self):
@@ -64,7 +64,7 @@ class MyTests(unittest.TestCase):
                 while True:
                     ser.write(b'.')
                     ser.timeout = 1
-                    reply = ser.read(100)
+                    reply = ser.read(28)
                     if reply == b'.\nBUSY\n':
                         continue            # still busy
 
