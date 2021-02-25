@@ -38,7 +38,8 @@ BUILD_DIR=$(ZEPHYR_HOME)build
 EXEC_OUT=$(ZEPHYR_HOME)build/zephyr/zephyr.elf
 EXEC_OPTIONS=-attach_uart_cmd="/dev/pts/4"
 TEST_SCRIPT=$(abspath test.py)
-TEST_COMMAND=python3 $(TEST_SCRIPT) $(TEST_SUITE) -v /dev/pts/0
+UART_PTY=/dev/pts/0
+TEST_COMMAND=python3 $(TEST_SCRIPT) $(TEST_SUITE) -v $(UART_PTY)
 
 # Build Executable
 all: $(EXEC_OUT)
@@ -50,15 +51,17 @@ $(EXEC_OUT): $(SOURCE_FILES)
 	@cd $(ZEPHYR_HOME) && west build -p auto -b $(BOARD_VAR) $(ABS_PRJ_DIR)
 	@echo "west build -p auto -b $(BOARD_VAR) $(ABS_PRJ_DIR)"
 
-# Run using "make test -j2"
-test: run python_test
+# Run Executable and Python-Test in two seperate Threads
+# They are connnected via the UART at /dev/pts/0
+test: $(EXEC_OUT)
+	@$(MAKE) -s run python_test -j2
 
 # Run Executable
 run: $(EXEC_OUT)
 	@echo "Running Project"
 	@$(EXEC_OUT) $(EXEC_OPTIONS)
 
-# Test Python => Fails if called alone => Use "make test -j2"
+# Test Python => Fails if called alone => Use "make test"
 python_test:
 	@echo "Running Test"
 	@$(TEST_COMMAND)
