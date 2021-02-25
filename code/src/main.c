@@ -88,12 +88,12 @@
 #define LOG_LEVEL CONFIG_CRYPTO_LOG_LEVEL
 LOG_MODULE_REGISTER(main);
 
-// Create Mutex for locking the Message-Queue
-// PTHREAD_MUTEX_DEFINE(lock);
+#define ALIVE_MESSAGES 0
 
 // 3 Threads + Main-Thread
 #define NUM_THREADS 3
 #define QUEUE_LEN 20
+#define QUEUE_TIMEOUT 1
 
 #define AES_KEY_LEN 16
 #define AES_IV_LEN 16
@@ -107,15 +107,24 @@ LOG_MODULE_REGISTER(main);
 
 #define MAIN_MESSAGE "Hello from Main-Thread"
 #define PROCESSING_MESSAGE "PROCESSING AVAILABLE\n"
+#define BUSY_MESSAGE "BUSY\n"
 #define POINT_STRING ".\n"
 
+#define ENCRYPT_CHAR "E\n"
+#define DECRYPT_CHAR "D\n"
+#define PROCESSING_CHAR "P\n"
+#define WAIT_CHAR "W\n"
+
+#define PROCESSING_THREAD_IDLE 0
+#define PROCESSING_THREAD_BUSY 1
+
 void init_threads(pthread_t * threads);
-void init_queue(void);
 
 /* ----- UART SECTION ------------------------------------------------------- */
 void state_machine();
 void send_via_uart(unsigned char tx);
 int send_string_via_uart(unsigned char * tx);
+int send_string_to_processing_thread(unsigned char * tx);
 void * uart_in_thread(void * x);
 void * uart_out_thread(void * x);
 /* ----- CRYPTO SECTION ----------------------------------------------------- */
@@ -139,7 +148,11 @@ enum operations{OP_INIT,OP_KEY,OP_IV,OP_ENCRYPT,OP_DECRYPT};
 // Can only be written by UART_READ-Thread
 // Can be read by all Threads
 static enum states prog_state = ST_INIT;
+volatile static enum states processing_thread_state = ST_INIT;
 static enum operations prog_operation = OP_INIT;
+
+K_MSGQ_DEFINE(message_queue, sizeof(char *), QUEUE_LEN, QUEUE_TIMEOUT);
+K_MSGQ_DEFINE(crypto_queue, sizeof(char *), QUEUE_LEN, QUEUE_TIMEOUT);
 
 // Globally declare Devices
 const struct device * uart_dev;
@@ -156,8 +169,6 @@ unsigned char g_key[AES_KEY_LEN] = {
 	0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42
 };
 uint32_t cap_flags;
-
-K_MSGQ_DEFINE(message_queue, sizeof(char *), QUEUE_LEN, 4);
 
 void main(void) {
 
@@ -180,12 +191,16 @@ void main(void) {
     pthread_t threads[NUM_THREADS];
 
     init_threads(threads);
-    init_queue();
 
     while(1) {
 
-        send_string_via_uart(MAIN_MESSAGE);
-        // printk("Main-Thread-Address = %s\n",MAIN_MESSAGE);
+
+        #if ALIVE_MESSAGES == 0
+            printk("%sMain-Thread is alive%s \n", COLOR_RED, RESET_COLOR);
+        #endif
+
+        // printk("%sMain-Thread-Address = %i%s\n", COLOR_BLUE, PROCESSING_CHAR, RESET_COLOR);
+        // send_string_to_processing_thread(PROCESSING_CHAR);
 
         sleep(5);
 
@@ -210,12 +225,6 @@ void init_threads(pthread_t * threads) {
 
 }
 
-void init_queue(void) {
-
-    // message_queue = mq_open("Message_queue", 0);
-
-}
-
 /* -------------------------------------------------------------------------- */
 /* ----- UART SECTION ------------------------------------------------------- */
 /* -------------------------------------------------------------------------- */
@@ -235,24 +244,32 @@ void state_machine() {
 
     while (1) {
 
-        // Wait for incoming Traffic
-        // TODO Read fucks up
-        //      Blocks State-Machine from sending "Processing"
-        if(!uart_poll_in(uart_dev,&uart_in)){
+        #if ALIVE_MESSAGES == 0
+            sleep(1);
+            printk("%sUART_in-Thread is alive%s \n", COLOR_GREEN, RESET_COLOR);
+        #endif
 
-            // printk("%sReceived : <%c> = <%i>%s",COLOR_BLUE,uart_in,uart_in,RESET_COLOR);
+        switch (prog_state) {
 
-            // Process incoming Traffic
-            switch (prog_state) {
+            case ST_INIT:
 
-                case ST_INIT:
+                // Wait for incoming Traffic
+                if(!uart_poll_in(uart_dev,&uart_in)){
+
+                    // printk("%sReceived : <%c> = <%i>%s",COLOR_GREEN,uart_in,uart_in,RESET_COLOR);
 
                     switch (uart_in) {
-                        case 'P':
-                            prog_state = ST_AVAIL;
-                            break;
                         case 'D':
                             prog_state = ST_DECRYPT;
+                            break;
+                        case 'E':
+                            prog_state = ST_ENCRYPT;
+                            break;
+                        case 'P':
+                            send_string_to_processing_thread(PROCESSING_CHAR);
+                            break;
+                        case 'W':
+                            send_string_to_processing_thread(WAIT_CHAR);
                             break;
                         case 'K':
                             prog_state = ST_KEY;
@@ -260,133 +277,121 @@ void state_machine() {
                         case 'I':
                             prog_state = ST_IV;
                             break;
-                        case 'W':
-                            prog_state = ST_BUSY;
-                            break;
                         // Echo-Test
                         case '.':
                             send_string_via_uart(POINT_STRING);
+                            if (processing_thread_state == ST_BUSY) {
+                                send_string_via_uart(BUSY_MESSAGE);
+                            }
+                            break;
                         default:
                             break;
                     };
-                    break;
 
-                case ST_AVAIL:
-                    prog_state = ST_INIT;
-                    send_string_via_uart(PROCESSING_MESSAGE);
-                    break;
+                }
+                break;
 
-                case ST_BUSY:
-                    prog_state = ST_INIT;
-                    // TODO Processing Thread Wart-Signal schicken
-                    break;
+            case ST_DECRYPT:
+                prog_state = ST_DLEN;
+                prog_operation = OP_DECRYPT;
+                break;
 
-                case ST_DECRYPT:
-                    prog_state = ST_DLEN;
-                    prog_operation = OP_DECRYPT;
-                    break;
+            case ST_ENCRYPT:
+                prog_state = ST_DLEN;
+                prog_operation = OP_ENCRYPT;
+                break;
 
-                case ST_ENCRYPT:
-                    prog_state = ST_DLEN;
-                    prog_operation = OP_ENCRYPT;
-                    break;
+            case ST_KEY:
+                prog_state = ST_DATA;
+                prog_operation = OP_KEY;
+                buffer = malloc(AES_KEY_LEN);
+                len = AES_KEY_LEN;
+                break;
 
-                case ST_KEY:
-                    prog_state = ST_DATA;
-                    prog_operation = OP_KEY;
-                    buffer = malloc(AES_KEY_LEN);
-                    len = AES_KEY_LEN;
-                    break;
+            case ST_IV:
+                prog_state = ST_DATA;
+                prog_operation = OP_IV;
+                buffer = malloc(AES_IV_LEN);
+                len = AES_IV_LEN;
+                break;
 
-                case ST_IV:
-                    prog_state = ST_DATA;
-                    prog_operation = OP_IV;
-                    buffer = malloc(AES_IV_LEN);
-                    len = AES_IV_LEN;
-                    break;
-
-                case ST_DLEN:
-                    prog_state = ST_DATA;
-                    while (1) {
-                        if(!uart_poll_in(uart_dev,&uart_in)){
-                            len = uart_in;
-                            break;
-                        }
-                        buffer = malloc(len);
-                        g_out_buffer = malloc(len);
+            case ST_DLEN:
+                prog_state = ST_DATA;
+                while (1) {
+                    if(!uart_poll_in(uart_dev,&uart_in)){
+                        len = uart_in;
+                        break;
                     }
-                    break;
+                    buffer = malloc(len);
+                    g_out_buffer = malloc(len);
+                }
+                break;
 
-                case ST_DATA:
-                    prog_state = ST_OP_SEL;
-                    iLauf = 0;
-                    while (len > iLauf){
-                        if(!uart_poll_in(uart_dev,&uart_in)){
-                            buffer[iLauf++] = uart_in;
-                            break;
-                        }
+            case ST_DATA:
+                prog_state = ST_OP_SEL;
+                iLauf = 0;
+                while (len > iLauf){
+                    if(!uart_poll_in(uart_dev,&uart_in)){
+                        buffer[iLauf++] = uart_in;
+                        break;
                     }
-                    break;
+                }
+                break;
 
-                case ST_OP_SEL:
-                    switch (prog_operation){
-                        case OP_KEY:
-                            prog_state = ST_OP_KEY;
-                            break;
-                        case OP_IV:
-                            prog_state = ST_OP_IV;
-                            break;
-                        case OP_DECRYPT:
-                            prog_state = ST_OP_DECRYPT;
-                            break;
-                        case OP_ENCRYPT:
-                            prog_state = ST_OP_ENCRYPT;
-                            break;
-                        default:
-                            prog_state = ST_INIT;
-                            free(buffer);
-                            free(g_out_buffer);
-                            break;
-                    };
+            case ST_OP_SEL:
+                switch (prog_operation){
+                    case OP_KEY:
+                        prog_state = ST_OP_KEY;
+                        break;
+                    case OP_IV:
+                        prog_state = ST_OP_IV;
+                        break;
+                    case OP_DECRYPT:
+                        prog_state = ST_OP_DECRYPT;
+                        break;
+                    case OP_ENCRYPT:
+                        prog_state = ST_OP_ENCRYPT;
+                        break;
+                    default:
+                        prog_state = ST_INIT;
+                        free(buffer);
+                        free(g_out_buffer);
+                        break;
+                };
 
-                case ST_OP_IV:
-                    strcpy(buffer,g_iv);
-                    prog_state = ST_INIT;
-                    prog_operation = OP_INIT;
-                    break;
+            case ST_OP_IV:
+                strcpy(buffer,g_iv);
+                prog_state = ST_INIT;
+                prog_operation = OP_INIT;
+                break;
 
-                case ST_OP_KEY:
-                    strcpy(buffer,g_key);
-                    prog_state = ST_INIT;
-                    prog_operation = OP_INIT;
-                    break;
+            case ST_OP_KEY:
+                strcpy(buffer,g_key);
+                prog_state = ST_INIT;
+                prog_operation = OP_INIT;
+                break;
 
-                case ST_OP_DECRYPT:
-                    g_in_buffer = buffer;
-                    cbc_mode(crypto_dev,CRYPTO_CIPHER_OP_DECRYPT);
-                    send_string_via_uart(g_out_buffer);
-                    prog_state = ST_INIT;
-                    prog_operation = OP_INIT;
-                    break;
+            // case ST_OP_DECRYPT:
+            //     g_in_buffer = buffer;
+            //     send_string_to_processing_thread(DECRYPT_CHAR);
+            //     while(processing_thread_state != ST_INIT);
+            //     prog_state = ST_INIT;
+            //     prog_operation = OP_INIT;
+            //     break;
+            //
+            // case ST_OP_ENCRYPT:
+            //     g_in_buffer = buffer;
+            //     send_string_to_processing_thread(ENCRYPT_CHAR);
+            //     while(processing_thread_state != ST_INIT);
+            //     prog_state = ST_INIT;
+            //     prog_operation = OP_INIT;
+            //     break;
 
-                case ST_OP_ENCRYPT:
-                    g_in_buffer = buffer;
-                    cbc_mode(crypto_dev,CRYPTO_CIPHER_OP_ENCRYPT);
-                    send_string_via_uart(g_out_buffer);
-                    prog_state = ST_INIT;
-                    prog_operation = OP_INIT;
-                    break;
-
-                default:
-                    prog_state = ST_INIT;
-                    prog_operation = OP_INIT;
-                    free(buffer);
-                    break;
-
-            }
-
-            // LOG_INF("\t%sReceived <%c> = <%d>", COLOR_BLUE, uart_in, uart_in);
-            // LOG_INF("\tState : <%i> , Operation : <%i>%s\n", prog_state,prog_operation,RESET_COLOR);
+            default:
+                prog_state = ST_INIT;
+                prog_operation = OP_INIT;
+                free(buffer);
+                break;
 
         }
 
@@ -397,6 +402,14 @@ void state_machine() {
 int send_string_via_uart(unsigned char * tx) {
 
     k_msgq_put(&message_queue,&tx,K_FOREVER);
+
+    return 0;
+
+}
+
+int send_string_to_processing_thread(unsigned char * tx) {
+
+    k_msgq_put(&crypto_queue,&tx,K_FOREVER);
 
     return 0;
 
@@ -417,8 +430,13 @@ void * uart_out_thread(void * x) {
 
     while (1) {
 
+        #if ALIVE_MESSAGES == 0
+            sleep(1);
+            printk("%sUART_out-Thread is alive%s \n",COLOR_YELLOW,RESET_COLOR);
+        #endif
+
         // Block until Data is available
-        if(!k_msgq_get(&message_queue,&message,K_FOREVER)) {
+        if(!k_msgq_get(&message_queue,&message,K_NO_WAIT)) {
 
             // Log received data
             // printk("%sMessage Queue : <%s>%s\n",COLOR_GREEN, message,RESET_COLOR);
@@ -512,7 +530,50 @@ void cbc_mode(const struct device *dev,uint8_t en_decrypt){
 
 void * process_thread(void * x) {
 
-    while(1);
+    char * message = "";
+
+    while(1) {
+
+        #if ALIVE_MESSAGES == 0
+            sleep(1);
+            printk("%sProcessing-Thread is alive%s \n", COLOR_BLUE, RESET_COLOR);
+        #endif
+
+        // Block until Data is available
+        if(!k_msgq_get(&crypto_queue,&message,K_NO_WAIT)) {
+
+            printk("%sProcessing Thread received : <%c> %s \n", COLOR_RED,message[0],RESET_COLOR);
+
+            switch (message[0]) {
+                case 'W':
+                    processing_thread_state = ST_BUSY;
+                    sleep(5);
+                    processing_thread_state = ST_INIT;
+                    break;
+                case 'P':
+                    processing_thread_state = ST_BUSY;
+                    send_string_via_uart(PROCESSING_MESSAGE);
+                    processing_thread_state = ST_INIT;
+                    break;
+            //     case 'E':
+            //         processing_thread_state = ST_BUSY;
+            //         cbc_mode(crypto_dev,CRYPTO_CIPHER_OP_ENCRYPT);
+            //         send_string_via_uart(g_out_buffer);
+            //         processing_thread_state = ST_INIT;
+            //         break;
+            //     case 'D':
+            //         processing_thread_state = ST_BUSY;
+            //         cbc_mode(crypto_dev,CRYPTO_CIPHER_OP_DECRYPT);
+            //         send_string_via_uart(g_out_buffer);
+            //         processing_thread_state = ST_INIT;
+            //         break;
+                default:
+                    processing_thread_state = ST_INIT;
+                    break;
+            }
+        }
+
+    }
 
     return x;
 

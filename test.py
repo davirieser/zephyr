@@ -33,20 +33,23 @@ class MyTests(unittest.TestCase):
     def test_00_connection_alive(self):
         with serial.serial_for_url("spy://{}".format(self.SERDEV)) as ser:
             ser.reset_input_buffer()
+            ser.timeout = 0.5
 
             # test if . characters are echoed
-            for i in range(0, 10):
+            for i in range(0, 50):
                 ser.write(b'.')
-                ser.timeout = 0.5
                 reply = ser.read(2)
                 self.assertEqual(reply, b'.\n')
 
     def test_01_availibility(self):
         with serial.serial_for_url("spy://{}".format(self.SERDEV)) as ser:
-            ser.write(b'P')
-            ser.timeout = 1
-            reply = ser.read(100)
-            self.assertEqual(reply, b"PROCESSING AVAILABLE\n")
+            ser.reset_input_buffer()
+            ser.timeout = 5
+
+            for i in range(0, 10):
+                ser.write(b'P')
+                reply = ser.read(100)
+                self.assertEqual(reply, b"PROCESSING AVAILABLE\n")
 
     def test_02_blocking(self):
         with serial.serial_for_url("spy://{}".format(self.SERDEV)) as ser:
@@ -72,7 +75,7 @@ class MyTests(unittest.TestCase):
         with serial.serial_for_url("spy://{}".format(self.SERDEV)) as ser:
             # bad length for cipher
             cyphertext = "AAE3"
-            bc = binascii.unhexlify(cyphertext) 
+            bc = binascii.unhexlify(cyphertext)
             data = b'D' + bytes([len(bc)]) + binascii.unhexlify(cyphertext) + b'X'
 
             for d in data:
@@ -82,13 +85,13 @@ class MyTests(unittest.TestCase):
             ser.timeout = 1
             reply = ser.read(100)
             self.assertEqual(reply, b'XERROR\n')
-        
+
 
     def test_04_decrypt_defaults(self):
         with serial.serial_for_url("spy://{}".format(self.SERDEV)) as ser:
             # deciphers to "Schoene Crypto Welt" with IV=BBBBBBBBBBBBBBBB and key=BBBBBBBBBBBBBBBB aes128-cbc
             cyphertext = "AAE365272C81078AB6116B361831D0F6A5D3C8587E946B530B7957543107F15E"
-            bc = binascii.unhexlify(cyphertext) 
+            bc = binascii.unhexlify(cyphertext)
             data = b'D' + bytes([len(bc)]) + binascii.unhexlify(cyphertext) + b'X'
 
             for d in data:
@@ -110,10 +113,10 @@ class MyTests(unittest.TestCase):
                 ser.write(bytes([d]))
                 time.sleep(0.1)
 
-    
+
             # deciphers to "Schoene Crypto Welt" with IV=BBBBBBBBBBBBBBBB and key=BBBBBBBBBBBBBBBB aes128-cbc
             cyphertext = "558F856896873142B16DC8F2EA8F334EDA7E8F7137877EC250AD733A7403CFC0"
-            bc = binascii.unhexlify(cyphertext) 
+            bc = binascii.unhexlify(cyphertext)
             data = b'D' + bytes([len(bc)]) + binascii.unhexlify(cyphertext) + b'X'
 
             for d in data:
@@ -134,4 +137,3 @@ if __name__ == "__main__":
     else:
         MyTests.SERDEV = sys.argv.pop()
         unittest.main()
-
