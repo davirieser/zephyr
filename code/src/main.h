@@ -44,15 +44,24 @@ LOG_MODULE_REGISTER(main);
 #define COLOR_YELLOW "\033[1;33m"
 #define COLOR_BLUE "\033[0;34m"
 
+#define NEWLINE_CHAR '\n'
+#define NEWLINE "\n"
+
 #define MAIN_MESSAGE "Hello from Main-Thread"
 #define PROCESSING_MESSAGE "PROCESSING AVAILABLE\n"
 #define BUSY_MESSAGE "BUSY\n"
 #define POINT_STRING ".\n"
+#define ERROR_MESSAGE "XERROR\n"
 
-#define ENCRYPT_CHAR "E\n"
-#define DECRYPT_CHAR "D\n"
-#define PROCESSING_CHAR "P\n"
-#define WAIT_CHAR "W\n"
+#define ENCRYPT_CHAR 'E'
+#define DECRYPT_CHAR 'D'
+#define PROCESSING_CHAR 'P'
+#define WAIT_CHAR 'W'
+
+#define ENCRYPT_STRING "E\n"
+#define DECRYPT_STRING "D\n"
+#define PROCESSING_STRING "P\n"
+#define WAIT_STRING "W\n"
 
 #define PROCESSING_THREAD_IDLE 0
 #define PROCESSING_THREAD_BUSY 1

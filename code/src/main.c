@@ -21,16 +21,21 @@ const struct uart_config uart_cfg = {
 		.flow_ctrl = UART_CFG_FLOW_CTRL_NONE
 	};
 
-static unsigned char * g_in_buffer = "Schoene Crypto Welt             ";
-static unsigned char * g_out_buffer;
-static unsigned char g_iv[AES_IV_LEN] = {
+// Create global Input-and-Output-Buffer-Pointers
+static uint8_t * g_in_buffer = "Schoene Crypto Welt             ";
+static uint8_t * g_out_buffer;
+// Create global Buffer-Length-Variable
+static uint16_t buffer_length = 32;
+// Create contingous IV and Key
+static uint8_t g_iv_key[AES_IV_LEN + AES_KEY_LEN] = {
+    0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42,
+	0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42,
     0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42,
 	0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42
 };
-static unsigned char g_key[AES_KEY_LEN] = {
-    0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42,
-	0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42
-};
+// Create Pointer to Key
+uint8_t * g_key = g_iv_key + AES_IV_LEN;
+// Create global Struct for Crypto-Hardware-Capability-Flags
 static uint32_t cap_flags;
 
 void main(void) {
@@ -60,13 +65,9 @@ void main(void) {
 
     while(1) {
 
-        #if ALIVE_MESSAGES == TRUE
-            printk("%sMain-Thread is alive%s \n", COLOR_RED, RESET_COLOR);
+        #if PROCESS_ALIVE == TRUE
+	        printk("%sMain-Thread is alive%s \n", COLOR_RED, RESET_COLOR);
         #endif
-
-        // send_string_to_processing_thread("E\n");
-
-        cbc_mode(crypto_dev,CRYPTO_CIPHER_OP_ENCRYPT);
 
         sleep(5);
 
@@ -104,9 +105,9 @@ void init_threads(pthread_t * threads) {
 
 void state_machine() {
 
-    unsigned char uart_in = '\0';
+    uint8_t uart_in = '\0';
     uint8_t iLauf = 0, len = 0;
-    unsigned char * buffer = "";
+    uint8_t * buffer = "";
 
     while (1) {
 
@@ -135,11 +136,11 @@ void state_machine() {
                             break;
                         case 'p':
                         case 'P':
-                            send_string_to_processing_thread(PROCESSING_CHAR);
+                            send_string_to_processing_thread(PROCESSING_STRING);
                             break;
                         case 'w':
                         case 'W':
-                            send_string_to_processing_thread(WAIT_CHAR);
+                            send_string_to_processing_thread(WAIT_STRING);
                             break;
                         case 'k':
                         case 'K':
@@ -182,14 +183,14 @@ void state_machine() {
             case ST_KEY:
                 prog_state = ST_DATA;
                 prog_operation = OP_KEY;
-                buffer = malloc(AES_KEY_LEN);
+                buffer = (uint8_t *) malloc(AES_KEY_LEN);
                 len = AES_KEY_LEN;
                 break;
 
             case ST_IV:
                 prog_state = ST_DATA;
                 prog_operation = OP_IV;
-                buffer = malloc(AES_IV_LEN);
+                buffer = (uint8_t *) malloc(AES_IV_LEN);
                 len = AES_IV_LEN;
                 break;
 
@@ -197,8 +198,15 @@ void state_machine() {
                 prog_state = ST_DATA;
                 while (1) {
                     if(!uart_poll_in(uart_dev,&uart_in)){
-                        len = uart_in;
-                        buffer = malloc(len);
+                        buffer_length = uart_in;
+						len = buffer_length;
+                        buffer = (uint8_t *) malloc(buffer_length * sizeof(uint8_t));
+						if(!buffer){
+							prog_state = ST_INIT;
+							prog_operation = OP_INIT;
+							LOG_ERR("Error allocating Memory for Input Buffer");
+						}
+						break;
                     }
                 }
                 break;
@@ -208,9 +216,10 @@ void state_machine() {
                 iLauf = 0;
                 while (len > iLauf){
                     if(!uart_poll_in(uart_dev,&uart_in)){
-                        buffer[iLauf++] = uart_in;
-                    }
+						buffer[iLauf++] = uart_in;
+					}
                 }
+				// print_data("Received : ", "%02X", buffer, buffer_length);
                 break;
 
             case ST_OP_SEL:
@@ -222,6 +231,7 @@ void state_machine() {
                         prog_state = ST_OP_IV;
                         break;
                     case OP_DECRYPT:
+						// print_data("Decrypting : ", "%02X", g_in_buffer, buffer_length);
                         prog_state = ST_OP_DECRYPT;
                         break;
                     case OP_ENCRYPT:
@@ -236,27 +246,27 @@ void state_machine() {
                 break;
 
             case ST_OP_IV:
-                strcpy(buffer,g_iv);
+                memcpy(buffer,g_iv_key,AES_IV_LEN);
                 prog_state = ST_INIT;
                 prog_operation = OP_INIT;
                 break;
 
             case ST_OP_KEY:
-                strcpy(buffer,g_key);
+                memcpy(buffer,g_key,AES_KEY_LEN);
                 prog_state = ST_INIT;
                 prog_operation = OP_INIT;
                 break;
 
             case ST_OP_DECRYPT:
                 g_in_buffer = buffer;
-                send_string_to_processing_thread(DECRYPT_CHAR);
+                send_string_to_processing_thread(DECRYPT_STRING);
                 prog_state = ST_INIT;
                 prog_operation = OP_INIT;
                 break;
 
             case ST_OP_ENCRYPT:
                 g_in_buffer = buffer;
-                send_string_to_processing_thread(ENCRYPT_CHAR);
+                send_string_to_processing_thread(ENCRYPT_STRING);
                 prog_state = ST_INIT;
                 prog_operation = OP_INIT;
                 break;
@@ -369,13 +379,11 @@ int validate_hw_compatibility(const struct device *dev) {
 }
 
 // See https://github.com/zephyrproject-rtos/zephyr/tree/master/include/crypto
+// See https://github.com/intel/tinycrypt
 
 void cbc_mode(const struct device *dev, uint8_t en_decrypt) {
 
-    g_in_buffer = malloc(32);
-    g_out_buffer = malloc(48);
-
-    g_in_buffer = "Schoene Crypto Welt             ";
+    g_out_buffer = malloc(buffer_length + AES_IV_LEN);
 
 	struct cipher_ctx ini = {
 		.keylen = AES_KEY_LEN,
@@ -384,39 +392,36 @@ void cbc_mode(const struct device *dev, uint8_t en_decrypt) {
 	};
 	struct cipher_pkt buffers = {
 		.in_buf = g_in_buffer,
-		.in_len = 32,
-		.out_buf_max = 48,
+		.in_len = buffer_length,
+		.out_buf_max = buffer_length + AES_KEY_LEN,
 		.out_buf = g_out_buffer,
 	};
 
 	if (cipher_begin_session(crypto_dev, &ini, CRYPTO_CIPHER_ALGO_AES,
 				 CRYPTO_CIPHER_MODE_CBC,
-				 CRYPTO_CIPHER_OP_ENCRYPT)) {
-		return;
+				 en_decrypt)) {
+ 		send_string_via_uart(ERROR_MESSAGE);
+		goto cleanup;
 	}
 
     print_data("Key : ", "%02X", g_key, AES_KEY_LEN);
-    print_data("IV : ", "%02X", g_iv, AES_KEY_LEN);
-    print_data("Input-Buffer : ", "%c", g_in_buffer, 32);
-    print_data("Input-Buffer Hex : ", "%02X", g_in_buffer, 32);
+    print_data("IV : ", "%02X", g_iv_key, AES_KEY_LEN);
+    print_data(
+		"Input-Buffer : ",
+		(en_decrypt == CRYPTO_CIPHER_OP_ENCRYPT ? "%c" : "%02X"),
+		g_in_buffer,
+		buffer_length
+	);
+    // print_data("Input-Buffer Hex : ", "%02X", g_in_buffer, buffer_length);
 
-	if (cipher_cbc_op(&ini, &buffers, g_iv)) {
+	if (cipher_cbc_op(&ini, &buffers, g_iv_key)) {
+		send_string_via_uart(ERROR_MESSAGE);
 		LOG_ERR("CBC mode ENCRYPT - Failed");
-	}else{
-        print_data("Encrypted : ", "%02X", g_out_buffer, 48);
-        printf("Trying : \n");
-        // print_data("Encrypted : ", "%c", g_out_buffer, 48);
-        int iLauf = 16,iLauf2 = 0;
-        while (iLauf2 <= 31) {
-            if (g_out_buffer[iLauf] != 0xFF){
-                printf("%02X", g_out_buffer[iLauf]);
-                iLauf2++;
-            }
-            iLauf ++;
-        }
-        printf("\n");
-    }
+		goto cleanup;
+	}
+    print_data("Encrypted : ", "%02X-", g_out_buffer, buffer_length + AES_KEY_LEN);
 
+cleanup:
 	cipher_free_session(dev, &ini);
 }
 
@@ -434,31 +439,29 @@ void * process_thread(void * x) {
         // Block until Data is available
         if(!k_msgq_get(&crypto_queue,&message,K_NO_WAIT)) {
 
-            printk("%sProcessing Thread received : <%c> %s \n", COLOR_RED,message[0],RESET_COLOR);
+            printk("%sProcessing Thread received : <%c> %s \n", COLOR_RED, message[0], RESET_COLOR);
 
             switch (message[0]) {
-                case 'W':
+                case ENCRYPT_CHAR:
                     processing_thread_state = ST_BUSY;
-                    sleep(5);
+                    cbc_mode(crypto_dev,CRYPTO_CIPHER_OP_ENCRYPT);
+                    send_string_via_uart(g_out_buffer);
                     processing_thread_state = ST_INIT;
                     break;
-                case 'P':
+                case DECRYPT_CHAR:
+                    processing_thread_state = ST_BUSY;
+                    cbc_mode(crypto_dev,CRYPTO_CIPHER_OP_DECRYPT);
+                    send_string_via_uart(g_out_buffer);
+                    processing_thread_state = ST_INIT;
+                    break;
+                case PROCESSING_CHAR:
                     processing_thread_state = ST_BUSY;
                     send_string_via_uart(PROCESSING_MESSAGE);
                     processing_thread_state = ST_INIT;
                     break;
-                case 'E':
+                case WAIT_CHAR:
                     processing_thread_state = ST_BUSY;
-                    cbc_mode(crypto_dev,CRYPTO_CIPHER_OP_ENCRYPT);
-                    //TODO Ghoert aussi
-                    // print_data("Encrypted : ","%X", g_out_buffer,strlen(g_out_buffer));
-                    send_string_via_uart(g_out_buffer);
-                    processing_thread_state = ST_INIT;
-                    break;
-                case 'D':
-                    processing_thread_state = ST_BUSY;
-                    cbc_mode(crypto_dev,CRYPTO_CIPHER_OP_DECRYPT);
-                    send_string_via_uart(g_out_buffer);
+                    sleep(5);
                     processing_thread_state = ST_INIT;
                     break;
                 default:
@@ -484,11 +487,11 @@ void print_data(
 
 	printk("%s\"",title);
 
-	const char * p = (const char*)data;
+	const unsigned char * p = (const unsigned char *) data;
 	int i = 0;
 
 	for (; i<len; ++i)
-		printk(formatter, *p++);
+		printk(formatter, *(p++));
 
 	printk("\"\n");
 

@@ -36,7 +36,7 @@ class MyTests(unittest.TestCase):
             ser.timeout = 0.5
 
             # test if . characters are echoed
-            for i in range(0, 50):
+            for i in range(0, 10):
                 ser.write(b'.')
                 reply = ser.read(2)
                 self.assertEqual(reply, b'.\n')
@@ -46,7 +46,7 @@ class MyTests(unittest.TestCase):
             ser.reset_input_buffer()
             ser.timeout = 1
 
-            for i in range(0, 10):
+            for i in range(0, 2):
                 ser.write(b'P')
                 reply = ser.read(21)
                 self.assertEqual(reply, b"PROCESSING AVAILABLE\n")
