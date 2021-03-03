@@ -36,7 +36,6 @@ SOURCE_FILES=$(wildcard $(PRJ_DIR)/*.*) $(wildcard $(PRJ_DIR)/*/*.*)
 ZEPHYR_HOME=~/zephyrproject/zephyr/
 BUILD_DIR=$(ZEPHYR_HOME)build
 EXEC_OUT=$(ZEPHYR_HOME)build/zephyr/zephyr.elf
-# EXEC_OPTIONS=-attach_uart_cmd="/dev/pts/4"
 TEST_SCRIPT=$(abspath test.py)
 UART_PTY=/dev/pts/0
 TEST_COMMAND=python3 $(TEST_SCRIPT) $(TEST_SUITE) -v $(UART_PTY)
@@ -62,13 +61,10 @@ run: $(EXEC_OUT)
 	@$(EXEC_OUT) $(EXEC_OPTIONS)
 
 # Test Python => Fails if called alone => Use "make test"
+.PHONY: python_test
 python_test:
 	@echo "Running Test"
 	@$(TEST_COMMAND)
-
-# See Configuration
-# config:
-# 	@cd $(ZEPHYR_HOME) && west build -t menuconfig
 
 # ------------------------------------------------------------------------------
 

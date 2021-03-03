@@ -5,7 +5,7 @@ static enum states prog_state = ST_INIT;
 volatile static enum states processing_thread_state = ST_INIT;
 static enum operations prog_operation = OP_INIT;
 
-K_MSGQ_DEFINE(message_queue, sizeof(char *), QUEUE_LEN, QUEUE_TIMEOUT);
+K_MSGQ_DEFINE(message_queue, sizeof(struct uart_message *), QUEUE_LEN, QUEUE_TIMEOUT);
 K_MSGQ_DEFINE(crypto_queue, sizeof(char *), QUEUE_LEN, QUEUE_TIMEOUT);
 
 // Globally declare Devices
@@ -145,14 +145,14 @@ void state_machine() {
                         case 'k':
                         case 'K':
                             // Ensure that Key is not changed during Encrytption/Decryption
-                            if (processing_thread_state == ST_BUSY) {
+                            if (!(processing_thread_state == ST_BUSY)) {
                                 prog_state = ST_KEY;
                             }
                             break;
                         case 'i':
                         case 'I':
                             // Ensure that IV is not changed during Encrytption/Decryption
-                            if (processing_thread_state == ST_BUSY) {
+                            if (!(processing_thread_state == ST_BUSY)) {
                                 prog_state = ST_IV;
                             }
                             break;
@@ -200,7 +200,13 @@ void state_machine() {
                     if(!uart_poll_in(uart_dev,&uart_in)){
                         buffer_length = uart_in;
 						len = buffer_length;
-                        buffer = (uint8_t *) malloc(buffer_length * sizeof(uint8_t));
+						if (prog_operation == OP_DECRYPT) {
+	                        buffer = (uint8_t *) malloc((buffer_length + AES_IV_LEN) * sizeof(uint8_t));
+							memcpy(buffer, g_iv_key, AES_IV_LEN);
+							buffer += AES_IV_LEN;
+						}else{
+	                        buffer = (uint8_t *) malloc(buffer_length * sizeof(uint8_t));
+						}
 						if(!buffer){
 							prog_state = ST_INIT;
 							prog_operation = OP_INIT;
@@ -232,6 +238,7 @@ void state_machine() {
                         break;
                     case OP_DECRYPT:
 						// print_data("Decrypting : ", "%02X", g_in_buffer, buffer_length);
+						buffer -= AES_IV_LEN;
                         prog_state = ST_OP_DECRYPT;
                         break;
                     case OP_ENCRYPT:
@@ -246,13 +253,13 @@ void state_machine() {
                 break;
 
             case ST_OP_IV:
-                memcpy(buffer,g_iv_key,AES_IV_LEN);
+                memcpy(g_iv_key,buffer,AES_IV_LEN);
                 prog_state = ST_INIT;
                 prog_operation = OP_INIT;
                 break;
 
             case ST_OP_KEY:
-                memcpy(buffer,g_key,AES_KEY_LEN);
+                memcpy(g_key,buffer,AES_KEY_LEN);
                 prog_state = ST_INIT;
                 prog_operation = OP_INIT;
                 break;
@@ -283,7 +290,7 @@ void state_machine() {
 
 }
 
-int send_string_via_uart(unsigned char * tx) {
+int send_string_via_uart(struct uart_message tx) {
 
     k_msgq_put(&message_queue,&tx,K_FOREVER);
 
@@ -299,6 +306,12 @@ int send_string_to_processing_thread(unsigned char * tx) {
 
 }
 
+int send_cipher_via_uart(unsigned char * en_decrypt, unsigned char * tx) {
+
+	return 0;
+
+}
+
 void * uart_in_thread(void * x) {
 
     state_machine();
@@ -310,7 +323,7 @@ void * uart_in_thread(void * x) {
 void * uart_out_thread(void * x) {
 
     int iLauf = 0;
-    char * message = "";
+    struct uart_message * message;
 
     while (1) {
 
@@ -326,9 +339,9 @@ void * uart_out_thread(void * x) {
             // printk("%sMessage Queue : <%s>%s\n",COLOR_GREEN, message,RESET_COLOR);
 
             // Send received data via UART
-            while(message[iLauf] != 0) {
+            while(iLauf < message->len) {
                 // printk("%sWriting <%c> = <%i>%s\n", COLOR_RED, message[iLauf], message[iLauf], RESET_COLOR);
-                uart_poll_out(uart_dev,message[iLauf++]);
+                uart_poll_out(uart_dev,message->message[iLauf++]);
             }
             // Reset Counter
             iLauf = 0;
@@ -383,7 +396,10 @@ int validate_hw_compatibility(const struct device *dev) {
 
 void cbc_mode(const struct device *dev, uint8_t en_decrypt) {
 
-    g_out_buffer = malloc(buffer_length + AES_IV_LEN);
+	uint32_t in_buffer_len = buffer_length + (en_decrypt == CRYPTO_CIPHER_OP_ENCRYPT ? 0 : 16);
+	uint32_t out_buffer_len = buffer_length + (en_decrypt == CRYPTO_CIPHER_OP_ENCRYPT ? 16 : 0);
+
+	g_out_buffer = malloc(out_buffer_len);
 
 	struct cipher_ctx ini = {
 		.keylen = AES_KEY_LEN,
@@ -392,16 +408,19 @@ void cbc_mode(const struct device *dev, uint8_t en_decrypt) {
 	};
 	struct cipher_pkt buffers = {
 		.in_buf = g_in_buffer,
-		.in_len = buffer_length,
-		.out_buf_max = buffer_length + AES_KEY_LEN,
+		.in_len = in_buffer_len,
+		.out_buf_max = out_buffer_len,
 		.out_buf = g_out_buffer,
 	};
 
-	if (cipher_begin_session(crypto_dev, &ini, CRYPTO_CIPHER_ALGO_AES,
-				 CRYPTO_CIPHER_MODE_CBC,
-				 en_decrypt)) {
- 		send_string_via_uart(ERROR_MESSAGE);
-		goto cleanup;
+	if (cipher_begin_session(
+		crypto_dev,
+		&ini,
+		CRYPTO_CIPHER_ALGO_AES,
+		CRYPTO_CIPHER_MODE_CBC,
+		en_decrypt)) {
+	 		send_string_via_uart(ERROR_MESSAGE);
+			goto cleanup;
 	}
 
     print_data("Key : ", "%02X", g_key, AES_KEY_LEN);
@@ -410,16 +429,23 @@ void cbc_mode(const struct device *dev, uint8_t en_decrypt) {
 		"Input-Buffer : ",
 		(en_decrypt == CRYPTO_CIPHER_OP_ENCRYPT ? "%c" : "%02X"),
 		g_in_buffer,
-		buffer_length
+		in_buffer_len
 	);
-    // print_data("Input-Buffer Hex : ", "%02X", g_in_buffer, buffer_length);
 
-	if (cipher_cbc_op(&ini, &buffers, g_iv_key)) {
+	if (cipher_cbc_op(
+		&ini,
+		&buffers,
+		((en_decrypt == CRYPTO_CIPHER_OP_DECRYPT) ? g_in_buffer : g_iv_key))) {
 		send_string_via_uart(ERROR_MESSAGE);
-		LOG_ERR("CBC mode ENCRYPT - Failed");
+		LOG_ERR("CBC mode failed");
 		goto cleanup;
 	}
-    print_data("Encrypted : ", "%02X-", g_out_buffer, buffer_length + AES_KEY_LEN);
+    print_data(
+		"CBC-Output-Buffer : ",
+		(en_decrypt == CRYPTO_CIPHER_OP_ENCRYPT ? "%02X" : "%c"),
+		g_out_buffer,
+		out_buffer_len
+	);
 
 cleanup:
 	cipher_free_session(dev, &ini);
@@ -428,6 +454,7 @@ cleanup:
 void * process_thread(void * x) {
 
     char * message = "";
+	struct uart_message message;
 
     while(1) {
 
@@ -445,13 +472,14 @@ void * process_thread(void * x) {
                 case ENCRYPT_CHAR:
                     processing_thread_state = ST_BUSY;
                     cbc_mode(crypto_dev,CRYPTO_CIPHER_OP_ENCRYPT);
-                    send_string_via_uart(g_out_buffer);
                     processing_thread_state = ST_INIT;
                     break;
                 case DECRYPT_CHAR:
                     processing_thread_state = ST_BUSY;
                     cbc_mode(crypto_dev,CRYPTO_CIPHER_OP_DECRYPT);
-                    send_string_via_uart(g_out_buffer);
+					send_string_via_uart(ENCRYPT_STRING);
+					message = {message: g_out_buffer, len: strlen(g_out_buffer)}
+                    send_string_via_uart(message);
                     processing_thread_state = ST_INIT;
                     break;
                 case PROCESSING_CHAR:
@@ -479,8 +507,8 @@ void * process_thread(void * x) {
 /* ---- Print Encrypted and Decrypted data packets -------------------------- */
 
 void print_data(
-    const char *title,
-    const char *formatter,
+    const unsigned char *title,
+    const unsigned char *formatter,
     const void* data,
     int len
 ){

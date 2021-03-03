@@ -52,6 +52,7 @@ LOG_MODULE_REGISTER(main);
 #define BUSY_MESSAGE "BUSY\n"
 #define POINT_STRING ".\n"
 #define ERROR_MESSAGE "XERROR\n"
+#define ZERO_STRING "\x00"
 
 #define ENCRYPT_CHAR 'E'
 #define DECRYPT_CHAR 'D'
@@ -70,7 +71,8 @@ void init_threads(pthread_t * threads);
 /* ----- UART SECTION ------------------------------------------------------- */
 void state_machine();
 void send_via_uart(unsigned char tx);
-int send_string_via_uart(unsigned char * tx);
+int send_string_via_uart(struct uart_message tx);
+int send_cipher_via_uart(unsigned char * en_decrypt, unsigned char * tx);
 int send_string_to_processing_thread(unsigned char * tx);
 void * uart_in_thread(void * x);
 void * uart_out_thread(void * x);
@@ -79,8 +81,8 @@ int validate_hw_compatibility(const struct device *dev);
 void cbc_mode(const struct device *dev,uint8_t en_decrypt);
 void * process_thread(void * x);
 void print_data(
-    const char *title,
-    const char *formatter,
+    const unsigned char *title,
+    const unsigned char *formatter,
     const void* data,
     int len
 );
@@ -91,6 +93,11 @@ enum states{
     ST_OP_SEL,ST_OP_KEY,ST_OP_IV,ST_OP_DECRYPT,ST_OP_ENCRYPT
 };
 enum operations{OP_INIT,OP_KEY,OP_IV,OP_ENCRYPT,OP_DECRYPT};
+
+struct uart_message{
+    unsigned char * message;
+    uint32_t len;
+};
 
 // int usleep(useconds_t useconds);
 
