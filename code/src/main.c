@@ -24,6 +24,7 @@ const struct uart_config uart_cfg = {
 // Create global Input-and-Output-Buffer-Pointers
 static uint8_t * g_in_buffer = "Schoene Crypto Welt             ";
 static uint8_t * g_out_buffer;
+static unsigned char * g_out_cipher_buffer;
 // Create global Buffer-Length-Variable
 static uint16_t buffer_length = 32;
 // Create contingous IV and Key
@@ -113,7 +114,7 @@ void state_machine() {
 
         #if ALIVE_MESSAGES == TRUE
             sleep(1);
-            printk("%sUART_in-Thread is alive%s \n", COLOR_GREEN, RESET_COLOR);
+            printk("%s%s%s\n", COLOR_GREEN, UART_IN_MESSAGE, RESET_COLOR);
         #endif
 
         switch (prog_state) {
@@ -123,7 +124,9 @@ void state_machine() {
                 // Wait for incoming Traffic
                 if(!uart_poll_in(uart_dev,&uart_in)){
 
-                    // printk("%sReceived : <%c> = <%i>%s",COLOR_GREEN,uart_in,uart_in,RESET_COLOR);
+					#if LOG_UART_IN == TRUE
+	                    printk("%sReceived : <%c> = <%i>%s",COLOR_GREEN,uart_in,uart_in,RESET_COLOR);
+					#endif
 
                     switch (uart_in) {
                         case 'd':
@@ -136,11 +139,11 @@ void state_machine() {
                             break;
                         case 'p':
                         case 'P':
-                            send_string_to_processing_thread(PROCESSING_STRING);
+                            send_string_to_processing_thread(PROCESSING_ID_STRING);
                             break;
                         case 'w':
                         case 'W':
-                            send_string_to_processing_thread(WAIT_STRING);
+                            send_string_to_processing_thread(WAIT_ID_STRING);
                             break;
                         case 'k':
                         case 'K':
@@ -158,9 +161,9 @@ void state_machine() {
                             break;
                         // Echo-Test
                         case '.':
-                            send_string_via_uart(POINT_STRING);
+                            send_message_via_uart(&POINT_MESSAGE);
                             if (processing_thread_state == ST_BUSY) {
-                                send_string_via_uart(BUSY_MESSAGE);
+                                send_message_via_uart(&BUSY_MESSAGE);
                             }
                             break;
                         default:
@@ -225,8 +228,7 @@ void state_machine() {
 						buffer[iLauf++] = uart_in;
 					}
                 }
-				// print_data("Received : ", "%02X", buffer, buffer_length);
-                break;
+				break;
 
             case ST_OP_SEL:
                 switch (prog_operation){
@@ -237,7 +239,6 @@ void state_machine() {
                         prog_state = ST_OP_IV;
                         break;
                     case OP_DECRYPT:
-						// print_data("Decrypting : ", "%02X", g_in_buffer, buffer_length);
 						buffer -= AES_IV_LEN;
                         prog_state = ST_OP_DECRYPT;
                         break;
@@ -246,8 +247,6 @@ void state_machine() {
                         break;
                     default:
                         prog_state = ST_INIT;
-                        free(buffer);
-                        free(g_out_buffer);
                         break;
                 };
                 break;
@@ -266,14 +265,14 @@ void state_machine() {
 
             case ST_OP_DECRYPT:
                 g_in_buffer = buffer;
-                send_string_to_processing_thread(DECRYPT_STRING);
+                send_string_to_processing_thread(DECRYPT_ID_STRING);
                 prog_state = ST_INIT;
                 prog_operation = OP_INIT;
                 break;
 
             case ST_OP_ENCRYPT:
                 g_in_buffer = buffer;
-                send_string_to_processing_thread(ENCRYPT_STRING);
+                send_string_to_processing_thread(ENCRYPT_ID_STRING);
                 prog_state = ST_INIT;
                 prog_operation = OP_INIT;
                 break;
@@ -281,7 +280,6 @@ void state_machine() {
             default:
                 prog_state = ST_INIT;
                 prog_operation = OP_INIT;
-                // free(buffer);
                 break;
 
         }
@@ -290,7 +288,22 @@ void state_machine() {
 
 }
 
-int send_string_via_uart(struct uart_message tx) {
+int send_string_via_uart(unsigned char * tx) {
+
+	static struct uart_message message;
+
+	message.message = tx;
+	message.len = strlen(tx);
+
+	struct uart_message * message_pointer = &message;
+
+    k_msgq_put(&message_queue,&message_pointer,K_FOREVER);
+
+    return 0;
+
+}
+
+int send_message_via_uart(struct uart_message * tx) {
 
     k_msgq_put(&message_queue,&tx,K_FOREVER);
 
@@ -306,7 +319,28 @@ int send_string_to_processing_thread(unsigned char * tx) {
 
 }
 
-int send_cipher_via_uart(unsigned char * en_decrypt, unsigned char * tx) {
+int send_out_buffer_via_uart(unsigned en_decrypt) {
+
+	g_out_cipher_buffer = malloc(buffer_length + 3);
+	if(en_decrypt == CRYPTO_CIPHER_OP_ENCRYPT) {
+		g_out_cipher_buffer[0] = 'E';g_out_cipher_buffer[1] = ' ';
+	}else{
+		g_out_cipher_buffer[0] = 'D';g_out_cipher_buffer[1] = ' ';
+	}
+	memcpy(g_out_cipher_buffer + 2, g_out_buffer, buffer_length);
+	g_out_cipher_buffer[buffer_length + 2] = '\x00';
+	static struct uart_message message;
+
+	#if LOG_CRYPTO_CBC == TRUE
+		print_data("Created CBC_Out: ", "%02X", g_out_cipher_buffer, buffer_length + 3);
+	#endif
+
+	message.message = g_out_cipher_buffer;
+	message.len = buffer_length + 3;
+
+	struct uart_message * message_pointer = &message;
+
+    k_msgq_put(&message_queue,&message_pointer,K_FOREVER);
 
 	return 0;
 
@@ -324,25 +358,30 @@ void * uart_out_thread(void * x) {
 
     int iLauf = 0;
     struct uart_message * message;
+	unsigned char * temp_pointer;
+	uint32_t temp_len;
 
     while (1) {
 
         #if ALIVE_MESSAGES == TRUE
             sleep(1);
-            printk("%sUART_out-Thread is alive%s \n",COLOR_YELLOW,RESET_COLOR);
+            printk("%s%s%s\n", COLOR_YELLOW, UART_OUT_MESSAGE, RESET_COLOR);
         #endif
 
         // Block until Data is available
         if(!k_msgq_get(&message_queue,&message,K_NO_WAIT)) {
 
-            // Log received data
-            // printk("%sMessage Queue : <%s>%s\n",COLOR_GREEN, message,RESET_COLOR);
+			// Create temporary Variables for faster access
+			temp_pointer = message->message;
+			temp_len = message->len;
 
             // Send received data via UART
-            while(iLauf < message->len) {
-                // printk("%sWriting <%c> = <%i>%s\n", COLOR_RED, message[iLauf], message[iLauf], RESET_COLOR);
-                uart_poll_out(uart_dev,message->message[iLauf++]);
+            while(iLauf < temp_len) {
+				uart_poll_out(uart_dev,temp_pointer[iLauf++]);
             }
+			#if LOG_UART_OUT == TRUE
+				print_data("Uart_Out_Thread sent : ", "%02X", temp_pointer,temp_len);
+			#endif
             // Reset Counter
             iLauf = 0;
 
@@ -394,10 +433,11 @@ int validate_hw_compatibility(const struct device *dev) {
 // See https://github.com/zephyrproject-rtos/zephyr/tree/master/include/crypto
 // See https://github.com/intel/tinycrypt
 
-void cbc_mode(const struct device *dev, uint8_t en_decrypt) {
+uint32_t cbc_mode(const struct device *dev, uint8_t en_decrypt) {
 
 	uint32_t in_buffer_len = buffer_length + (en_decrypt == CRYPTO_CIPHER_OP_ENCRYPT ? 0 : 16);
 	uint32_t out_buffer_len = buffer_length + (en_decrypt == CRYPTO_CIPHER_OP_ENCRYPT ? 16 : 0);
+	uint32_t return_val = 0;
 
 	g_out_buffer = malloc(out_buffer_len);
 
@@ -419,84 +459,91 @@ void cbc_mode(const struct device *dev, uint8_t en_decrypt) {
 		CRYPTO_CIPHER_ALGO_AES,
 		CRYPTO_CIPHER_MODE_CBC,
 		en_decrypt)) {
-	 		send_string_via_uart(ERROR_MESSAGE);
+	 		send_message_via_uart(&ERROR_MESSAGE);
+			return_val = -1;
 			goto cleanup;
 	}
 
-    print_data("Key : ", "%02X", g_key, AES_KEY_LEN);
-    print_data("IV : ", "%02X", g_iv_key, AES_KEY_LEN);
-    print_data(
-		"Input-Buffer : ",
-		(en_decrypt == CRYPTO_CIPHER_OP_ENCRYPT ? "%c" : "%02X"),
-		g_in_buffer,
-		in_buffer_len
-	);
+	#if LOG_CRYPTO_CBC == TRUE
+	    print_data("Key : ", "%02X", g_key, AES_KEY_LEN);
+	    print_data("IV : ", "%02X", g_iv_key, AES_KEY_LEN);
+	    print_data(
+			"Input-Buffer : ",
+			(en_decrypt == CRYPTO_CIPHER_OP_ENCRYPT ? "%c" : "%02X"),
+			g_in_buffer,
+			in_buffer_len
+		);
+	#endif
 
 	if (cipher_cbc_op(
 		&ini,
 		&buffers,
 		((en_decrypt == CRYPTO_CIPHER_OP_DECRYPT) ? g_in_buffer : g_iv_key))) {
-		send_string_via_uart(ERROR_MESSAGE);
-		LOG_ERR("CBC mode failed");
-		goto cleanup;
+			send_message_via_uart(&ERROR_MESSAGE);
+			return_val = -1;
+			LOG_ERR("CBC mode failed");
+			goto cleanup;
 	}
-    print_data(
-		"CBC-Output-Buffer : ",
-		(en_decrypt == CRYPTO_CIPHER_OP_ENCRYPT ? "%02X" : "%c"),
-		g_out_buffer,
-		out_buffer_len
-	);
+
+	#if LOG_CRYPTO_CBC == TRUE
+	    print_data(
+			"CBC-Output-Buffer : ",
+			(en_decrypt == CRYPTO_CIPHER_OP_ENCRYPT ? "%02X" : "%c"),
+			g_out_buffer,
+			out_buffer_len
+		);
+	#endif
 
 cleanup:
 	cipher_free_session(dev, &ini);
+
+	return return_val;
 }
 
 void * process_thread(void * x) {
 
-    char * message = "";
-	struct uart_message message;
+	unsigned char * message;
 
     while(1) {
 
         #if ALIVE_MESSAGES == TRUE
             sleep(1);
-            printk("%sProcessing-Thread is alive%s \n", COLOR_BLUE, RESET_COLOR);
+            printk("%s%s%s\n", COLOR_BLUE, PROCESSING_THREAD_MESSAGE, RESET_COLOR);
         #endif
 
-        // Block until Data is available
         if(!k_msgq_get(&crypto_queue,&message,K_NO_WAIT)) {
 
-            printk("%sProcessing Thread received : <%c> %s \n", COLOR_RED, message[0], RESET_COLOR);
+			#if LOG_PROCESSING_THREAD == TRUE
+	            printk("%sProcessing Thread received : <%c> %s \n", COLOR_RED, message[0], RESET_COLOR);
+			#endif
 
             switch (message[0]) {
                 case ENCRYPT_CHAR:
                     processing_thread_state = ST_BUSY;
-                    cbc_mode(crypto_dev,CRYPTO_CIPHER_OP_ENCRYPT);
-                    processing_thread_state = ST_INIT;
+                    if(!cbc_mode(crypto_dev,CRYPTO_CIPHER_OP_ENCRYPT)){
+						send_out_buffer_via_uart(CRYPTO_CIPHER_OP_ENCRYPT);
+					}
                     break;
                 case DECRYPT_CHAR:
                     processing_thread_state = ST_BUSY;
-                    cbc_mode(crypto_dev,CRYPTO_CIPHER_OP_DECRYPT);
-					send_string_via_uart(ENCRYPT_STRING);
-					message = {message: g_out_buffer, len: strlen(g_out_buffer)}
-                    send_string_via_uart(message);
-                    processing_thread_state = ST_INIT;
+                    if(!cbc_mode(crypto_dev,CRYPTO_CIPHER_OP_DECRYPT)){
+						send_out_buffer_via_uart(CRYPTO_CIPHER_OP_DECRYPT);
+					}
                     break;
                 case PROCESSING_CHAR:
                     processing_thread_state = ST_BUSY;
-                    send_string_via_uart(PROCESSING_MESSAGE);
-                    processing_thread_state = ST_INIT;
+                    send_message_via_uart(&PROCESSING_MESSAGE);
                     break;
                 case WAIT_CHAR:
                     processing_thread_state = ST_BUSY;
                     sleep(5);
-                    processing_thread_state = ST_INIT;
                     break;
                 default:
-                    processing_thread_state = ST_INIT;
                     break;
             }
-        }
+        }else{
+			processing_thread_state = ST_INIT;
+		}
 
     }
 
