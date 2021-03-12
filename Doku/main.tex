@@ -1,0 +1,204 @@
+\documentclass[12pt,a4paper,fleqn,leqno,openany]{article}
+
+% Package Imports --------------------------------------------------------------
+
+\usepackage{tikz}
+\usepackage{tcolorbox}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{lastpage}
+\usepackage{fancyhdr}
+\usepackage{hyperref}
+\usepackage{float}
+
+% Parameter Setup --------------------------------------------------------------
+
+% Define Constant "true"
+\newcommand{\true}{true}
+
+% Define automatically filled in Information
+\newcommand{\Schueler}{David Rieser}
+\newcommand{\Lehrer}{Prof. Lezuo}
+\newcommand{\Uebungsname}{Zephyr Serieller Krypto-Prozessor} % Name von der Uebung
+\newcommand{\ToC}{true} % Table Of Contents - Inhaltsverzeichnis
+\newcommand{\LoF}{true} % List Of Figures - Abbildverzeichnis
+\newcommand{\LoL}{true} % List Of Listings - Codeverzeichnis
+
+% Title, Header and Footer Setup -----------------------------------------------
+\pagestyle{fancy}
+\fancyhf{}
+
+% Define Title-Page
+\title{\Uebungsname}
+\author{\Schueler\\Betreuer~:~\Lehrer}
+% \date{} % When left out fills in current Date automatically
+
+% Define Header and Footer Text
+\rhead{5BHEL}
+\lhead{\Uebungsname}
+\rfoot{Page~\thepage ~of~\pageref{LastPage}}
+\lfoot{HTL-Anichstrasse}
+
+% Add Lines under the Header and over the Footer
+\renewcommand{\headrulewidth}{1pt}
+\renewcommand{\footrulewidth}{1pt}
+
+% Graphics Setup ---------------------------------------------------------------
+
+\graphicspath{{Pictures/}}
+
+% Example Picture
+%
+% \begin{figure}[bht!]
+% 	\centering
+% 	\includegraphics[width=0.8\textwidth]{Bild.jpg}
+% 	\caption{Bildbeschreibung}
+%	\label{fig:Bildamrker}
+% \end{figure}
+%
+% Link to Picture
+%
+% \ref{Referenz:Bild}
+
+% Listings Setup ---------------------------------------------------------------
+
+\lstset{
+	alsoletter=-,
+    basicstyle=\footnotesize\ttfamily,
+    breaklines=true,
+	captionpos=b,
+	columns=fullflexible,
+    frame=trBL,
+	language=C,
+	numbers=left,
+	numbersep=10pt,
+	numberstyle=\tiny,
+	showstringspaces=false,
+	showtabs=true,
+	stepnumber=1,
+	tab=,
+	tabsize=4,
+	title=\lstname,
+	% Define Comments
+    commentstyle=\color{lightgray},
+	morecomment=[l][\color{lightgray}]{\\\\},
+	morecomment=[l][\color{lightgray}]{//},
+	morecomment=[l][\color{lightgray}]{\%},
+	morecomment=[s][\color{lightgray}]{/*}{*/},
+	morecomment=[s][\color{lightgray}]{\\*}{*\\},
+	% Define Strings
+	stringstyle=\color{orange},
+	morestring=[s][\color{orange}]{\$}{\$}
+}
+
+% Example Listing
+%
+% \begin{lstlisting}[Options]
+%	Code
+% \end{lstlisting}
+%
+% Example File Import
+%
+% \lstinputlisting[Options]{filename}
+%
+% Define New Language
+%
+% \lstdefinelanguage{JavaScript}{
+%   keywords={typeof, new, true, false, catch, function, return, null, catch, switch, var, if, in, while, do, else, case, break},
+%   keywordstyle=\color{blue}\bfseries,
+%   ndkeywords={class, export, boolean, throw, implements, import, this},
+%   ndkeywordstyle=\color{darkgray}\bfseries,
+%   identifierstyle=\color{black},
+%   sensitive=false,
+%   comment=[l]{//},
+%   morecomment=[s]{/*}{*/},
+%   commentstyle=\color{purple}\ttfamily,
+%   stringstyle=\color{red}\ttfamily,
+%   morestring=[b]',
+%   morestring=[b]"
+% }
+%
+% Define New Style
+%
+% \lstdefinestyle{StyleMatlab}
+% {
+%   belowcaptionskip=1\baselineskip,
+%   breaklines=true,
+%   xleftmargin=\parindent,
+%   language=Matlab,
+%   frame = single,
+%   showstringspaces=false,
+%   basicstyle=\footnotesize\ttfamily,
+%   keywordstyle=\bfseries\color{black},
+%   commentstyle=\color{green},
+%   identifierstyle=\color{blue},
+%   stringstyle=\color{magenta},
+% }
+
+% Hyperlink Setup --------------------------------------------------------------
+
+\urlstyle{same}
+\hypersetup{
+    colorlinks=true,	% Enable Link-Colors
+    linkcolor=blue, 	% Color of Internal-Document-Links
+    filecolor=magenta, 	% Color of Local-File-Links
+    urlcolor=cyan, 		% Color of URL-Links
+}
+
+% Hyperref Setup
+%
+% \label{Marker} 			% To setup the Marker
+%
+% \url{url}					% Clickable URL
+% \href{url}{Link-Text}		% Clickable Text leading to URL
+% \ref{Marker}				% To reference the Marker (Returns Number)
+% \pageref{Marker}			% To reference the Marker (Returns Number)
+% \nameref{Marker}			% To reference the Marker (Returns Name)
+
+% ------------------------------------------------------------------------------
+% Document Start ---------------------------------------------------------------
+% ------------------------------------------------------------------------------
+
+\begin{document}
+
+% Disable Pagenumbering for Titlepage and Table of Contents
+\pagenumbering{gobble}
+
+% Create Title-Page
+\begin{titlepage}
+	\maketitle
+\end{titlepage}
+
+\pagebreak
+
+% Remove Header and Footer for Table of Contents
+\thispagestyle{empty}
+
+\ifx\ToC\true
+	\renewcommand\contentsname{Inhaltsverzeichnis}
+	\tableofcontents
+\fi
+\pagebreak
+\ifx\LoF\true
+	\let\oldnumberline\numberline
+	\renewcommand{\numberline}[1]{\hspace*{-1.5em}}
+	\renewcommand\listfigurename{Abbildungsverzeichnis}
+	\listoffigures
+	\let\numberline\oldnumberline
+\fi
+\ifx\LoL\true
+	\renewcommand\lstlistlistingname{Codeverzeichnis}
+	\lstlistoflistings
+\fi
+
+\pagebreak
+
+\pagenumbering{arabic}
+
+\input{build/Section1.tex}
+% \input{build/Section2.tex}
+% \input{build/Section3.tex}
+% \input{build/Section4.tex}
+
+\end{document}

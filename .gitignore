@@ -1,0 +1,15 @@
+# Blacklist everything
+*
+
+# Whitelist all Files and Directories in the Top-Level
+!/*
+
+# Whitelist .gitignore
+!.gitignore
+
+# Whitelist Code-Directory
+!/code/**
+
+# Whitelist Documentation Folder
+!Doku/*
+!Doku/*/*.tex
