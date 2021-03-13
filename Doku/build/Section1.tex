@@ -164,6 +164,10 @@ It is developed and maintained by
 
 \section{Project Execution}
 
+The Complete Codebase for the Project can be found on:
+\href{https://github.com/davirieser/zephyr}
+{Github}
+
 \subsection{Block-Diagram}
 
 The Serial-Crypto Processor is split into four Threads:
@@ -180,7 +184,7 @@ The Serial-Crypto Processor is split into four Threads:
 
 \begin{figure}[!ht]
 	\begin{center}
-		\includegraphics[width=0.8\linewidth]{Blockschaltbild.png}
+		\includegraphics[width=0.75\linewidth]{Blockschaltbild.png}
 		\caption{Serial Crypto Processor Block Diagram}
 	\end{center}
 \end{figure}
@@ -420,6 +424,8 @@ while (!stop_flag) {
 }
 \end{lstlisting}
 
+\pagebreak
+
 \subsection{UART-Out-Thread}
 
 The UART-Out-Thread handles the Processors Serial-Output and ensures
@@ -435,8 +441,6 @@ struct uart_message{
 	uint32_t len;
 };
 \end{lstlisting}
-
-\pagebreak
 
 The UART-Out-Thread basically sits in an Endless-Loop and waits
 for Messages to come in:
@@ -476,23 +480,25 @@ unsigned char * message;
 // Run until the Stop-Flag is set
 while (!stop_flag) {
 	if(!k_msgq_get(&crypto_queue,&message,K_NO_WAIT)) {
-		switch (message[0]) {
-			case ENCRYPT_CHAR:
-				// Encrypt Buffer and send via UART
-			case DECRYPT_CHAR:
-				// Decrypt Buffer and send via UART
-			case PROCESSING_CHAR:
-				// Send "Processing Available"
-			case WAIT_CHAR:
-				sleep(10);
-			default:
-				break;
-	}
+			switch (message[0]) {
+				case ENCRYPT_CHAR:
+					// Encrypt Buffer and send via UART
+				case DECRYPT_CHAR:
+					// Decrypt Buffer and send via UART
+				case PROCESSING_CHAR:
+					// Send "Processing Available"
+				case WAIT_CHAR:
+					sleep(10);
+				default:
+					break;
+		}
 	}
 }
 \end{lstlisting}
 
 \subsection{Encryption and Decryption}
+
+\subsubsection{Input and Output Buffers}
 
 The Parameters for Encryption and Decrytion are stored in static global
 Buffers so they can be accessed by all Threads when neccessary.
@@ -504,22 +510,21 @@ static uint8_t * g_out_buffer;
 static uint16_t buffer_length;
 
 // Create contingous IV and Key with Default-Values "BBBBBBBBBBBBBBBB"
-static uint8_t g_iv_key[AES_IV_LEN + AES_KEY_LEN] = {
-    0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42,
-	0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42,
-    0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42,
-	0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x42
-};
+// This is Pseudo-Code
+static uint8_t g_iv_key[AES_IV_LEN + AES_KEY_LEN];
+memset(g_iv_key, 'B', AES_IV_LEN + AES_KEY_LEN);
 \end{lstlisting}
-
 
 To prevent Race-Conditions with these Buffers the UART-In-Thread can only
 access the Buffers when the Processing-Thread is not using them.
 
 \pagebreak
 
-Encryption and Decryption is implemented in the same Function as there
-is only one Parameter which is different:
+\subsubsection{Implmentation}
+
+Encryption and Decryption are implemented in the same Funtion.
+The caller can choose wheter to encrypt or decrypt using the
+``en\_decrypt``-Argument:
 
 \begin{lstlisting}[style=CStyle,caption=Encryption and Decryption Pseudo-Code]
 uint32_t cbc_mode(const struct device *dev, uint8_t en_decrypt) {
