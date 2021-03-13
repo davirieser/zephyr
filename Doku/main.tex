@@ -11,6 +11,7 @@
 \usepackage{fancyhdr}
 \usepackage{hyperref}
 \usepackage{float}
+\usepackage{caption}
 
 % Parameter Setup --------------------------------------------------------------
 
@@ -20,7 +21,7 @@
 % Define automatically filled in Information
 \newcommand{\Schueler}{David Rieser}
 \newcommand{\Lehrer}{Prof. Lezuo}
-\newcommand{\Uebungsname}{Zephyr Serieller Krypto-Prozessor} % Name von der Uebung
+\newcommand{\Uebungsname}{Serial-Crypto-Processor using Zephyr} % Name von der Uebung
 \newcommand{\ToC}{true} % Table Of Contents - Inhaltsverzeichnis
 \newcommand{\LoF}{true} % List Of Figures - Abbildverzeichnis
 \newcommand{\LoL}{true} % List Of Listings - Codeverzeichnis
@@ -30,8 +31,8 @@
 \fancyhf{}
 
 % Define Title-Page
-\title{\Uebungsname}
-\author{\Schueler\\Betreuer~:~\Lehrer}
+\title{Serial Crypto Processor\\ Using Zephyr}
+\author{\Schueler\\Supervisor~:~\Lehrer}
 % \date{} % When left out fills in current Date automatically
 
 % Define Header and Footer Text
@@ -63,6 +64,10 @@
 
 % Listings Setup ---------------------------------------------------------------
 
+\definecolor{mGreen}{rgb}{0,0.6,0}
+\definecolor{mGray}{rgb}{0.5,0.5,0.5}
+\definecolor{mPurple}{rgb}{0.58,0,0.82}
+
 \lstset{
 	alsoletter=-,
     basicstyle=\footnotesize\ttfamily,
@@ -70,7 +75,6 @@
 	captionpos=b,
 	columns=fullflexible,
     frame=trBL,
-	language=C,
 	numbers=left,
 	numbersep=10pt,
 	numberstyle=\tiny,
@@ -88,8 +92,37 @@
 	morecomment=[s][\color{lightgray}]{/*}{*/},
 	morecomment=[s][\color{lightgray}]{\\*}{*\\},
 	% Define Strings
-	stringstyle=\color{orange},
-	morestring=[s][\color{orange}]{\$}{\$}
+	stringstyle=\color{orange}
+}
+
+\lstdefinelanguage{C}%
+	{morekeywords={auto,break,case,char,const,continue,default,do,double,else,enum,extern,float,for,goto,if,int,long,register,return,short,signed,sizeof,static,struct,switch,typedef,union,unsigned,void,volatile,while},%
+	sensitive,%
+	morecomment=[s]{/*}{*/},%
+	morecomment=[l]//,% nonstandard
+	morestring=[b]",%
+	morestring=[b]',%
+	moredelim=*[directive]\#,%
+	moredirectives={define,elif,else,endif,error,if,ifdef,ifndef,line,include,pragma,undef,warning}%
+	}[keywords,comments,strings,directives]
+
+\lstdefinestyle{CStyle}{
+    commentstyle=\color{mGreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{mGray},
+    stringstyle=\color{mPurple},
+    basicstyle=\footnotesize,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2,
+    language=[ANSI]{C}
 }
 
 % Example Listing
@@ -165,10 +198,23 @@
 % Disable Pagenumbering for Titlepage and Table of Contents
 \pagenumbering{gobble}
 
+\captionsetup[figure]{list=no}
+
 % Create Title-Page
 \begin{titlepage}
 	\maketitle
+	\begin{figure}[!ht]
+		\begin{center}
+			\includegraphics[width=\linewidth]{EyeCatcher.jpg}
+			\caption{
+				\href{https://unsplash.com/photos/FXFz-sW0uwo?utm_source=unsplash&utm_medium=referral&utm_content=creditShareLink}
+				{Photo by Markus Spiske on Unsplash}
+			}
+		\end{center}
+	\end{figure}
 \end{titlepage}
+
+\captionsetup[figure]{list=yes}
 
 \pagebreak
 
@@ -176,19 +222,18 @@
 \thispagestyle{empty}
 
 \ifx\ToC\true
-	\renewcommand\contentsname{Inhaltsverzeichnis}
 	\tableofcontents
 \fi
 \pagebreak
+\thispagestyle{empty}
 \ifx\LoF\true
 	\let\oldnumberline\numberline
 	\renewcommand{\numberline}[1]{\hspace*{-1.5em}}
-	\renewcommand\listfigurename{Abbildungsverzeichnis}
+	\renewcommand\listfigurename{Figures}
 	\listoffigures
 	\let\numberline\oldnumberline
 \fi
 \ifx\LoL\true
-	\renewcommand\lstlistlistingname{Codeverzeichnis}
 	\lstlistoflistings
 \fi
 
@@ -197,8 +242,5 @@
 \pagenumbering{arabic}
 
 \input{build/Section1.tex}
-% \input{build/Section2.tex}
-% \input{build/Section3.tex}
-% \input{build/Section4.tex}
 
 \end{document}

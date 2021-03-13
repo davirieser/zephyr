@@ -370,7 +370,7 @@ int send_out_buffer_via_uart(unsigned en_decrypt) {
 	// Copy Crypto-Output-Buffer to Send-Buffer
 	memcpy(g_out_cipher_buffer + 2, g_out_buffer, buffer_length);
 	// Add Zero-Termination to Send-Buffer
-	g_out_cipher_buffer[buffer_length + 2] = ZERO_STRING;
+	g_out_cipher_buffer[buffer_length + 2] = ZERO_CHAR;
 
 	// Create new Message-Struct for Send-Buffer
 	static struct uart_message message;
