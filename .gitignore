@@ -13,3 +13,4 @@
 # Whitelist Documentation Folder
 !Doku/*
 !Doku/*/*.tex
+!Doku/Pictures/*.svg

@@ -108,6 +108,13 @@ Buffers store data for later use and First-In-First-Out means
 that the data which came in first comes out first.
 FIFO-Buffers can deliver data between Threads in a safe manner.
 
+\begin{figure}[!ht]
+	\begin{center}
+		\includegraphics[width=0.4\linewidth]{Message_Queue.png}
+		\caption{Message-Queue Example Diagram}
+	\end{center}
+\end{figure}
+
 \pagebreak
 
 \subsection{West}
@@ -156,6 +163,29 @@ It is developed and maintained by
 \pagebreak
 
 \section{Project Execution}
+
+\subsection{Block-Diagram}
+
+The Serial-Crypto Processor is split into four Threads:
+\begin{itemize}
+	\item Main-Thread\\
+		Responsible for starting the other Threads
+	\item UART-In-Thread\\
+		Responsible for incoming UART-Traffic and the Statemachine
+	\item Processing Thread\\
+		Responsible for Crypto-Operations
+	\item UART-Out-Thread\\
+		Responsible for outgoing UART-Traffic
+\end{itemize}
+
+\begin{figure}[!ht]
+	\begin{center}
+		\includegraphics[width=0.8\linewidth]{Blockschaltbild.png}
+		\caption{Serial Crypto Processor Block Diagram}
+	\end{center}
+\end{figure}
+
+\pagebreak
 
 \subsection{Build-Settings}
 
