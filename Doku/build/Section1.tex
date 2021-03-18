@@ -20,35 +20,30 @@
 
 \section{Project Requirements}
 
-The Goal of the Project is to create a Processor which can receive data, then
-encrypt or decrypt this data using AES-128 and then send it back via a
+The Project consists of the creation of a Processor which can receive data, then
+encrypt or decrypt this data using AES-128 and then send it back via the
 Serial-Interface.
 \\
 \\
-The Processor was developed using the
+The Processor should be developed using the
 \href{https://docs.zephyrproject.org/2.0.0/boards/posix/native_posix/doc/index.html?highlight=native_posix}
 {native\_posix-Board}.
 Using the
 \href{https://docs.zephyrproject.org/2.0.0/boards/posix/native_posix/doc/index.html?highlight=native_posix}
 {native\_posix-Board} the Program can be compiled into a normal
-executable which can be run on the Host-System (e.g. Linux or Windows).
+executable which can be run on the Host-System (e.g. Linux).
 \\
 \\
-The
-\href{https://docs.zephyrproject.org/2.0.0/boards/posix/native_posix/doc/index.html?highlight=native_posix}
-{native\_posix-Board} has one big limitation which is that Interrupts cannot be
-implemented. This means the Program had to be developed using non-blocking Calls.
-\\
-\\
-The Serial-Interface is implemented using the UART-Inteface which will connect to
+The Serial-Interface should be implemented using the UART-Inteface which will connect to
 /dev/pts/0 when the Board is started.
 \\
 \\
-The Cryptographic Operations (AES-128 Encryption and Decryption) are implemented
+The Crypto-Processor should run using a predefined Statemachine and is to be
+tested using a Python Unit-Test-Script.
+\\
+\\
+The Cryptographic Operations (AES-128 Encryption and Decryption) should be implemented
 using the Tinycrypt-Crypto-Device.
-\\
-\\
-The Crypto-Processor should run using a predefined Statemachine:
 
 \begin{figure}[!ht]
 	\begin{center}
@@ -56,6 +51,77 @@ The Crypto-Processor should run using a predefined Statemachine:
 		\caption{Statemachine}
 	\end{center}
 \end{figure}
+
+\pagebreak
+
+\section{Project Implementation Details}
+
+The Project's Goal is to create a Encryption and Decrytion device which
+doesn't need a lot of resources and can be easily accessed using UART.
+
+\subsection{West}
+
+West builds very efficiently because it especially targets devices with
+less resources available.
+\\
+Because this project uses West, additional functionality can simply be added
+by changing the Configuration-File.
+\\
+West also removes the need for a complex build-system but comes with the disadvantage
+that a big workspace is needed and that a lot of overhead is generated during Compilation.
+
+\subsection{Tinycrypt}
+
+Tinycrypt enables devices with limited resources to encrypt and decrypt data
+with a variety of Algorithms at a good pace because it is implemented using
+Assembler.
+\\
+Tinycrypt's downside is that it needs it's memory setup in a particular manner
+where the buffers are contingous.
+\\
+\\
+Tinycrypt also only allows one Crypto-Operation at the same Time per device
+which limits the scalabilty if no additional Hardware is provided.
+
+\subsection{Program Implementation}
+
+The Program is implemented using a Statemachine and seperate Message-Queues
+per Thread which enables it to be modified very quickly.
+\\
+The Threads each have a dedicated task and complement each other, which creates
+an efficient system as a whole, but require some baseline hardware to work.
+\\
+\\
+The implementation on the
+\href{https://docs.zephyrproject.org/2.0.0/boards/posix/native_posix/doc/index.html?highlight=native_posix}
+{native\_posix-Board} has one big drawback which is that Interrupts cannot be
+implemented.
+This means the Program had to be developed using non-blocking Calls.
+If the Program is to be implemented on a proper device these can be rewritten easily
+using the equivalent blocking statements.
+
+% \subsection{Program Implementation}
+%
+% Project Advantages:
+% \begin{itemize}
+% 	\item Easily modifiable\\
+% 			The Project can be easily modified because of ``West``.\\
+% 			The UART is also implemented in such a way that adding additional
+% 			functionality is easy.\\
+% 	\item Low Resource Intensity\\
+% 			Because Zephyr only includes Dependencies it
+% 			really needs and is developed to be efficient especially on limited Hardware\\
+% 			The program was also developed in such a way that memory use is minimal.
+% 	\item Project can be deployed to any Board which is already defined in Zephyr
+% \end{itemize}
+%
+% Project Disadvantages:
+% \begin{itemize}
+% 	\item Project is rather complex because of the large Workspace and Build-Tools it needs
+% 	\item Project takes long to build especially when the Dependencies are changed
+% 	\item Currently only one Crypto-Action can take place at a time so it is
+% 			hard to scale unless additional Hardware is provided.
+% \end{itemize}
 
 \pagebreak
 
@@ -120,7 +186,8 @@ FIFO-Buffers can deliver data between Threads in a safe manner.
 \subsection{West}
 
 \href{https://docs.zephyrproject.org/2.4.0/guides/west/index.html}
-{West} is Zephyr's Meta-Tool.
+{West} is Zephyr's Meta-Tool, that means it uses other tools which
+in turn build the actual application.
 \href{https://docs.zephyrproject.org/2.4.0/guides/west/index.html}
 {West} initializes, maintains and builds Zephyr-Workspaces
 using
@@ -129,17 +196,18 @@ using
 \href{https://cmake.org/}
 {CMake}.
 
-\subsubsection{Ninja}
-
-\href{https://ninja-build.org/manual.html}
-{Ninja} is a small build system that focusses on Speed.
-
 \subsubsection{CMake}
 
 \href{https://cmake.org/}
 {CMake} is a Tool to automate Building, Testing and Packaging
-in Software Projects.\\
+in Software Projects.
+\\
 It can also generate Ninja Files for faster Building.
+
+\subsubsection{Ninja}
+
+\href{https://ninja-build.org/manual.html}
+{Ninja} is a small build system that focusses on Speed.
 
 \subsection{Linux Pseudo-Terminals}
 
@@ -558,3 +626,23 @@ After Encryption and Decrytion the Processing-Thread sends the Output-Buffer
 to the UART-Out-Thread so it can be sent back via UART\_0.
 Once the Output-Buffer is sent, the Processing-Thread forfeits access of
 the Buffers so the UART-In-Thread can also modify them.
+
+\pagebreak
+
+\subsection{Unit-Tests}
+
+To verify the functionality of the Crypto-Processor a simple Python Script
+was provided.
+\\
+In this Python-File 6 Unit-Tests were definded:
+
+\begin{itemize}
+	\item If the Connection via UART works
+	\item If the Crypto-Processor is available
+	\item What is sent when the Crypto-Processor is busy
+	\item What happens if someone tries to decode a faulty dataset
+	\item A Test if a dataset is decrypted correctly using the standard Parameters
+	\item A Decryption-Test using a custom Key and IV
+\end{itemize}
+
+All 6 Unit-Tests were passed by the Crypto-Processor.
