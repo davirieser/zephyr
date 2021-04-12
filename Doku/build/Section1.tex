@@ -1,23 +1,3 @@
-% aus der Angabe kopiert:
-%
-% Dokumentation
-% Dokumentieren und Beschreiben Sie: west, ninja, Kconfig,
-% DTS, threads und message_queues (ca. 8 Seiten)
-%
-% zu allen genannten Punkten:
-%
-% * welches Problem löst es?
-% * wie ist es umgesetzt?
-% * wie unterscheidet es sich alternativen Lösungen?
-%
-% Der Code dokumentiert sich hoffentlich selbst, bzw. hat an kritischen Stellen
-% Source Kommentare,
-% d.h. nicht Teil der Dokumentation.
-%
-% Du solltest dich auf ca. 8 Seiten beschränken, d.h. auf die wichtigsten Dinge
-% (was auch immer du für wichtig hältst und diese Auswahl ist Teil der Bewertung ;)
-
-
 \section{Project Requirements}
 
 The Project consists of the creation of a Processor which can receive data, then
@@ -54,36 +34,113 @@ using the Tinycrypt-Crypto-Device.
 
 \pagebreak
 
-\section{Project Implementation Details}
+\section{Project Advantages and Disadvantages}
 
-The Project's Goal is to create a Encryption and Decrytion device which
-doesn't need a lot of resources and can be easily accessed using UART.
+\subsection{Zephyr}
+
+\href{https://zephyrproject.org/}{Zephyr} is a RTOS (Real-Time-Operating-System).
+\\
+An OS (Operating System) handles the Low-Level Functions and Execution, enabling
+Developers to write Code which can be run independent of the actual Hardware.
+OS's are in charge of Memory-, Process- and Device-Management.
+\\
+\\
+A RTOS in Contrast to a normal OS removes the randomness of Task Sheduling
+making the System more reliable, by placing Constraints on when each Process
+is executed. In a normal OS most Processes switch randomly (Round-Robin) while in RTOS
+every Process can be interrupted by another Process with a higher Priority (Preemptive Sheduling).
+\\
+\href{https://predictabledesigns.com/introduction-to-real-time-operating-systems-rtos-for-use-in-embedded-systems/}
+{Introduction to RTOS}
+\\
+\\
+\href{https://zephyrproject.org/}{Zephyr} is designed for Resource-Constrained
+Devices and is build using the ``West``-Meta-Tool.
+\\
+It is developed by
+\href{https://www.linuxfoundation.org/}
+{The Linux Foundation} and released under the
+\href{https://www.apache.org/licenses/LICENSE-2.0.html}
+{Apache License 2.0}.
+\\
+\\
+\href{https://docs.zephyrproject.org/2.4.0/index.html}
+{Zephyr 2.4.0} was used for this Project.
+It was installed for WSL2 on Windows 10 using the
+\href{https://docs.zephyrproject.org/2.4.0/getting_started/index.html}
+{official Getting-Started-Guide from Zephyr}
 
 \subsection{West}
 
-West builds very efficiently because it especially targets devices with
-less resources available.
+\href{https://docs.zephyrproject.org/2.4.0/guides/west/index.html}
+{West} is Zephyr's Meta-Tool.
 \\
-Because this project uses West, additional functionality can simply be added
-by changing the Configuration-File.
+It oversees the Build-Process and manages the Repository.
 \\
-West also removes the need for a complex build-system but comes with the disadvantage
-that a big workspace is needed and that a lot of overhead is generated during Compilation.
+West makes sure the right Versions of the Zephyr-Libraries are installed and
+passed to the Build-System.
+\\
+It replaces Package-Managers like
+\href{https://en.wikipedia.org/wiki/APT_(software)}{apt}
+or
+\href{https://conan.io/}{Conan}.
+\\
+\\
+West also works in Conjunction with Ninja and CMake to build the actual Application
+using the Zephyr SDK's (Software Development Kit).
 
-\subsection{Tinycrypt}
+\pagebreak
 
-Tinycrypt enables devices with limited resources to encrypt and decrypt data
-with a variety of Algorithms at a good pace because it is implemented using
-Assembler.
-\\
-Tinycrypt's downside is that it needs it's memory setup in a particular manner
-where the buffers are contingous.
-\\
-\\
-Tinycrypt also only allows one Crypto-Operation at the same Time per device
-which limits the scalabilty if no additional Hardware is provided.
+\subsection{CMake}
 
-\subsection{Program Implementation}
+\href{https://cmake.org/}
+{CMake} is a Software Development Tool which can generate Build Files for other
+Build-Systems or other Build-Tools.
+\\
+West uses CMake to generate Build-Files for Ninja.
+\\
+CMake can also be used to find Dependencies for Source-Code, testing Executables,
+and packaging Releases.
+
+\subsection{Ninja}
+
+\href{https://ninja-build.org/}{Ninja} is a Build-Tools which is designed to be
+as fast as possible and to have it's Build-Files created by a higher-level
+Build-System (like CMake).
+\\
+Ninja is meant to replace the conventional ``Make``-Build-System which is slow
+when building big Projects with lots of Files.
+
+\subsection{KConfig}
+
+\href{https://www.kernel.org/doc/html/latest/kbuild/kconfig-language.html}
+{KConfig} is a configuration system originally developed for the Linux-Kernel
+which can be used to enable or disable features or to select build-time-Options.
+\\
+\\
+West looks at the KConfig-File before Building and moves the needed Dependencies
+to the Build-Directory so the Build-System can use them.
+
+\subsubsection{Device Tree}
+
+\href{https://docs.zephyrproject.org/2.0.0/guides/dts/index.html}
+{The Device Tree} is a way of defining hardware and configuration
+Information for Zephyr-Boards.
+\\
+It is used so Code can be dynamically included or excluded for
+every Board without hard-coding every device into the OS.
+\\
+\\
+It removes the need for hardcoded Addresses inside the Libraries and enables
+that Libraries can be reused across a range of different devices with
+different Hardware.
+
+\pagebreak
+
+\section{Program Implementation}
+
+The Project's Goal is to create a Encryption and Decrytion device which
+doesn't need a lot of resources and can be easily accessed using UART.
 
 The Program is implemented using a Statemachine and seperate Message-Queues
 per Thread which enables it to be modified very quickly.
@@ -96,82 +153,26 @@ The implementation on the
 \href{https://docs.zephyrproject.org/2.0.0/boards/posix/native_posix/doc/index.html?highlight=native_posix}
 {native\_posix-Board} has one big drawback which is that Interrupts cannot be
 implemented.
+\\
 This means the Program had to be developed using non-blocking Calls.
+\\
 If the Program is to be implemented on a proper device these can be rewritten easily
 using the equivalent blocking statements.
-
-% \subsection{Program Implementation}
-%
-% Project Advantages:
-% \begin{itemize}
-% 	\item Easily modifiable\\
-% 			The Project can be easily modified because of ``West``.\\
-% 			The UART is also implemented in such a way that adding additional
-% 			functionality is easy.\\
-% 	\item Low Resource Intensity\\
-% 			Because Zephyr only includes Dependencies it
-% 			really needs and is developed to be efficient especially on limited Hardware\\
-% 			The program was also developed in such a way that memory use is minimal.
-% 	\item Project can be deployed to any Board which is already defined in Zephyr
-% \end{itemize}
-%
-% Project Disadvantages:
-% \begin{itemize}
-% 	\item Project is rather complex because of the large Workspace and Build-Tools it needs
-% 	\item Project takes long to build especially when the Dependencies are changed
-% 	\item Currently only one Crypto-Action can take place at a time so it is
-% 			hard to scale unless additional Hardware is provided.
-% \end{itemize}
-
-\pagebreak
-
-\section{Used Technologies}
-
-\subsection{Zephyr}
-
-\href{https://zephyrproject.org/}
-{Zephyr} is a small real-time operating system for embedded devices with constraints
-on hardware resources which supports multiple different architectures
-developed by
-\href{https://www.linuxfoundation.org/}
-{The Linux Foundation}.\\
-Zephyr is released under the
-\href{https://www.apache.org/licenses/LICENSE-2.0.html}
-{Apache License 2.0}.
-\\
-\\
-\href{https://docs.zephyrproject.org/2.4.0/index.html}
-{Zephyr 2.4.0} was used for this Project.
-It was installed for WSL2 on Windows 10 using the
-\href{https://docs.zephyrproject.org/2.4.0/getting_started/index.html}
-{official Getting-Started-Guide from Zephyr}
-
-\subsubsection{KConfig}
-
-\href{https://www.kernel.org/doc/html/latest/kbuild/kconfig-language.html}
-{KConfig} is a configuration system originally developed for the Linux-Kernel
-which can be used to enable or disable features or to select build-time-Options.
-
-\subsubsection{Device Tree}
-
-\href{https://docs.zephyrproject.org/2.0.0/guides/dts/index.html}
-{The Device Tree} is a way of defining hardware and configuration
-Information for Zephyr-Boards.
-\\
-It is used so Code can be dynamically included or excluded for
-every Board without hard-coding every device into the OS.
 
 \subsubsection{Threads}
 
 A Thread is a sequence of instruction which can be run
 independent of it's parent-process (the main-Thread in this case).
-This allows the CPU to work on seperate Jobs simultaniously.
+\\
+This allows the CPU to work on seperate Jobs simultaneously.
 
 \subsubsection{Message-Queues}
 
 Message Queues are FIFO-Buffers (First-In-First-Out-Buffers).
+\\
 Buffers store data for later use and First-In-First-Out means
 that the data which came in first comes out first.
+\\
 FIFO-Buffers can deliver data between Threads in a safe manner.
 
 \begin{figure}[!ht]
@@ -180,34 +181,6 @@ FIFO-Buffers can deliver data between Threads in a safe manner.
 		\caption{Message-Queue Example Diagram}
 	\end{center}
 \end{figure}
-
-\pagebreak
-
-\subsection{West}
-
-\href{https://docs.zephyrproject.org/2.4.0/guides/west/index.html}
-{West} is Zephyr's Meta-Tool, that means it uses other tools which
-in turn build the actual application.
-\href{https://docs.zephyrproject.org/2.4.0/guides/west/index.html}
-{West} initializes, maintains and builds Zephyr-Workspaces
-using
-\href{https://ninja-build.org/manual.html}
-{Ninja} and
-\href{https://cmake.org/}
-{CMake}.
-
-\subsubsection{CMake}
-
-\href{https://cmake.org/}
-{CMake} is a Tool to automate Building, Testing and Packaging
-in Software Projects.
-\\
-It can also generate Ninja Files for faster Building.
-
-\subsubsection{Ninja}
-
-\href{https://ninja-build.org/manual.html}
-{Ninja} is a small build system that focusses on Speed.
 
 \subsection{Linux Pseudo-Terminals}
 
@@ -227,6 +200,18 @@ in Assembler and implemented in Zephyr.
 It is developed and maintained by
 \href{https://01.org/}
 {Intel's Open Souce Technlolgy Center}.
+\\
+\\
+Tinycrypt enables devices with limited resources to encrypt and decrypt data
+with a variety of Algorithms at a good pace because it is implemented using
+Assembler.
+\\
+Tinycrypt's downside is that it needs it's memory setup in a particular manner
+where the buffers are contingous.
+\\
+\\
+Tinycrypt also only allows one Crypto-Operation at the same Time per device
+which limits the scalabilty if no additional Hardware is provided.
 
 \pagebreak
 
@@ -318,7 +303,7 @@ The Message-Queues can be initialised using a Macro which
 is already defined by Zephyr :
 \\
 \begin{lstlisting}[style=CStyle, caption=Message Queue Initialisation]
-K_MSGQ_DEFINE(<Name>, <Data-Size>, <Queue-Length>, <Queue-Timeout>);
+K_MSGQ_DEFINE(<Name>, <Data-Size>, <Queue-Length>, <Queue-Alignment>);
 \end{lstlisting}
 During Initialisation 2 Message-Queues are defined, one for
 the UART-Out-Thread and one for the Processing-Thread:

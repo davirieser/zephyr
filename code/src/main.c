@@ -148,7 +148,12 @@ void state_machine() {
                 if(!uart_poll_in(uart_dev,&uart_in)){
 
 					#if LOG_UART_IN == TRUE
-	                    LOG_INF("%sReceived : <%c> = <%i>%s",UART_IN_COLOR,uart_in,uart_in,RESET_COLOR);
+	                    LOG_INF("%sReceived : <%c> = <%i>%s",
+							UART_IN_COLOR,
+							uart_in,
+							uart_in,
+							RESET_COLOR
+						);
 					#endif
 
                     switch (uart_in) {
@@ -182,6 +187,11 @@ void state_machine() {
                                 prog_state = ST_IV;
                             }
                             break;
+						// Stop-Signal
+						case 's':
+						case 'S':
+							stop_flag = TRUE;
+							break;
                         // Echo-Test
                         case '.':
                             send_message_via_uart(&POINT_MESSAGE);
@@ -189,11 +199,6 @@ void state_machine() {
                                 send_message_via_uart(&BUSY_MESSAGE);
                             }
                             break;
-						// Stop-Signal
-						case 'z':
-						case 'Z':
-							stop_flag = TRUE;
-							break;
                         default:
                             break;
                     };
@@ -257,7 +262,11 @@ void state_machine() {
 					}
                 }
 					#if LOG_UART_IN == TRUE
-		                LOG_INF("%sBuffer-In-Data : <%s>%s",UART_IN_COLOR,buffer,RESET_COLOR);
+		                LOG_INF("%sBuffer-In-Data : <%s>%s",
+						UART_IN_COLOR,
+						buffer,
+						RESET_COLOR
+					);
 					#endif
 				break;
 
@@ -362,9 +371,11 @@ int send_out_buffer_via_uart(unsigned en_decrypt) {
 
 	// Create Identifier for Receiving Program
 	if(en_decrypt == CRYPTO_CIPHER_OP_ENCRYPT) {
-		g_out_cipher_buffer[0] = ENCRYPT_CHAR;g_out_cipher_buffer[1] = ' ';
+		g_out_cipher_buffer[0] = ENCRYPT_CHAR;
+		g_out_cipher_buffer[1] = ' ';
 	}else{
-		g_out_cipher_buffer[0] = DECRYPT_CHAR;g_out_cipher_buffer[1] = ' ';
+		g_out_cipher_buffer[0] = DECRYPT_CHAR;
+		g_out_cipher_buffer[1] = ' ';
 	}
 
 	// Copy Crypto-Output-Buffer to Send-Buffer
@@ -379,7 +390,8 @@ int send_out_buffer_via_uart(unsigned en_decrypt) {
 
 	#if LOG_CRYPTO_CBC == TRUE
 		printk("%s", UART_OUT_COLOR);
-		print_data("Created CBC_Out: ", "%02X", g_out_cipher_buffer, buffer_length + 3);
+		print_data("Created CBC_Out: ", "%02X",
+			g_out_cipher_buffer, buffer_length + 3);
 		// Flush Output using Newline
 		printk("%s\n", RESET_COLOR);
 	#endif
@@ -445,7 +457,10 @@ void * uart_out_thread(void * x) {
 
 			#if LOG_UART_OUT == TRUE
 				printk("%s", UART_OUT_COLOR);
-				print_data("Uart_Out_Thread sent : ", "%02X", temp_pointer,temp_len);
+				print_data("Uart_Out_Thread sent : ", "%02X",
+					temp_pointer,
+					temp_len
+				);
 				// Flush Output using Newline
 				printk("%s\n", RESET_COLOR);
 			#endif
@@ -515,8 +530,10 @@ uint32_t cbc_mode(const struct device *dev, uint8_t en_decrypt) {
 				RESET_COLOR);
 	#endif
 
-	uint32_t in_buffer_len = buffer_length + (en_decrypt == CRYPTO_CIPHER_OP_ENCRYPT ? 0 : 16);
-	uint32_t out_buffer_len = buffer_length + (en_decrypt == CRYPTO_CIPHER_OP_ENCRYPT ? 16 : 0);
+	uint32_t in_buffer_len = buffer_length +
+		(en_decrypt == CRYPTO_CIPHER_OP_ENCRYPT ? 0 : 16);
+	uint32_t out_buffer_len = buffer_length +
+		(en_decrypt == CRYPTO_CIPHER_OP_ENCRYPT ? 16 : 0);
 	uint32_t return_val = 0;
 
 	g_out_buffer = malloc(out_buffer_len);
@@ -591,7 +608,10 @@ cleanup:
 void * process_thread(void * x) {
 
     #if LOG_PROCESSING_THREAD == TRUE
-		LOG_INF("%sProcess-Thread started%s", PROCESSING_THREAD_COLOR, RESET_COLOR);
+		LOG_INF("%sProcess-Thread started%s",
+			PROCESSING_THREAD_COLOR,
+			RESET_COLOR
+		);
 	#endif
 
 	unsigned char * message;
@@ -601,13 +621,21 @@ void * process_thread(void * x) {
 
         #if ALIVE_MESSAGES == TRUE
             sleep(1);
-            LOG_INF("%s%s%s\n", COLOR_BLUE, PROCESSING_THREAD_MESSAGE, RESET_COLOR);
+            LOG_INF("%s%s%s\n",
+				COLOR_BLUE,
+				PROCESSING_THREAD_MESSAGE,
+				RESET_COLOR
+			);
         #endif
 
         if(!k_msgq_get(&crypto_queue,&message,K_NO_WAIT)) {
 
 			#if LOG_PROCESSING_THREAD == TRUE
-	            LOG_INF("%sProcessing Thread received : <%c> %s \n", PROCESSING_THREAD_COLOR, message[0], RESET_COLOR);
+	            LOG_INF("%sProcessing Thread received : <%c> %s \n",
+					PROCESSING_THREAD_COLOR,
+					message[0],
+					RESET_COLOR
+				);
 			#endif
 
             switch (message[0]) {
@@ -641,7 +669,10 @@ void * process_thread(void * x) {
     }
 
     #if LOG_PROCESSING_THREAD == TRUE
-		LOG_INF("%sProcess-Thread stopped%s", PROCESSING_THREAD_COLOR, RESET_COLOR);
+		LOG_INF("%sProcess-Thread stopped%s",
+			PROCESSING_THREAD_COLOR,
+			RESET_COLOR
+		);
 	#endif
 
     return x;
