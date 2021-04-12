@@ -86,10 +86,20 @@ or
 \href{https://conan.io/}{Conan}.
 \\
 \\
-West also works in Conjunction with Ninja and CMake to build the actual Application
-using the Zephyr SDK's (Software Development Kit).
+West also works in Conjunction with KConfig, CMake and Ninja to build the actual
+Application using the Zephyr SDK's (Software Development Kit).
 
 \pagebreak
+
+\subsection{KConfig}
+
+\href{https://www.kernel.org/doc/html/latest/kbuild/kconfig-language.html}
+{KConfig} is a configuration system originally developed for the Linux-Kernel
+which can be used to enable or disable features or to select build-time-Options.
+\\
+\\
+West looks at the KConfig-File before Building and moves the specified Dependencies
+to the Build-Directory so the Build-System can use them.
 
 \subsection{CMake}
 
@@ -110,16 +120,6 @@ Build-System (like CMake).
 \\
 Ninja is meant to replace the conventional ``Make``-Build-System which is slow
 when building big Projects with lots of Files.
-
-\subsection{KConfig}
-
-\href{https://www.kernel.org/doc/html/latest/kbuild/kconfig-language.html}
-{KConfig} is a configuration system originally developed for the Linux-Kernel
-which can be used to enable or disable features or to select build-time-Options.
-\\
-\\
-West looks at the KConfig-File before Building and moves the needed Dependencies
-to the Build-Directory so the Build-System can use them.
 
 \subsubsection{Device Tree}
 
