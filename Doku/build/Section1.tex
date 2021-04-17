@@ -38,7 +38,8 @@ using the Tinycrypt-Crypto-Device.
 
 \subsection{Zephyr}
 
-\href{https://zephyrproject.org/}{Zephyr} is a RTOS (Real-Time-Operating-System).
+\href{https://zephyrproject.org/}
+{Zephyr} is a RTOS (Real-Time-Operating-System).
 \\
 An OS (Operating System) handles the Low-Level Functions and Execution, enabling
 Developers to write Code which can be run independent of the actual Hardware.
@@ -86,26 +87,20 @@ or
 \href{https://conan.io/}{Conan}.
 \\
 \\
-West also works in Conjunction with KConfig, CMake and Ninja to build the actual
-Application using the Zephyr SDK's (Software Development Kit).
+West also is a Build-Tool and works in Conjunction with KConfig, CMake and Ninja
+to build the actual Application using the Zephyr SDK's (Software Development Kit).
 
 \pagebreak
-
-\subsection{KConfig}
-
-\href{https://www.kernel.org/doc/html/latest/kbuild/kconfig-language.html}
-{KConfig} is a configuration system originally developed for the Linux-Kernel
-which can be used to enable or disable features or to select build-time-Options.
-\\
-\\
-West looks at the KConfig-File before Building and moves the specified Dependencies
-to the Build-Directory so the Build-System can use them.
 
 \subsection{CMake}
 
 \href{https://cmake.org/}
 {CMake} is a Software Development Tool which can generate Build Files for other
 Build-Systems or other Build-Tools.
+\\
+\\
+CMake has a relatively simple interpreted functional scripting language and can
+determine some Dependencies automaticall using ``add\_executable(...)`` or ``add\_library(...)``.
 \\
 West uses CMake to generate Build-Files for Ninja.
 \\
@@ -120,19 +115,56 @@ Build-System (like CMake).
 \\
 Ninja is meant to replace the conventional ``Make``-Build-System which is slow
 when building big Projects with lots of Files.
+\\
+\\
+Ninja and Make enable a Developer to specify how a project should be built
+by creating a ``Makefile``-, or ``build.ninja``-File.
+\\
+\\
+In these Files the Developer can specify different Recipes and some associated
+Commands. The Commands from these Recipts can then be executed in the Command-Line
+every time the Developer invokes them using ``make [Recipe]`` or ``ninja [Recipe]``.
+\\
+\\
+This removes a lot of burden from the Developer which now only has to
+specify which Recipe should be build instead of having to remember multiple
+Commands for every Source-File which is needed for the Build.
+
+\pagebreak
+
+\subsection{KConfig}
+
+\href{https://www.kernel.org/doc/html/latest/kbuild/kconfig.html}
+{KConfig} is a configuration system originally developed for the Linux-Kernel.
+KConfig handles Configuration Options (also called symbols) and makes sure that
+the selected Options are valid.
+\\
+The ``native\_posix``-Board for Example cannot set the ``UART\_ASYNC\_API``-Option
+because Interrupts cannot be implemented on the ``native\_posix``-Board.
+\\
+To accomodate this the normal UART has to be used:
+\\
+``CONFIG\_UART\_NATIVE\_POSIX``.
+\\
+\\
+West then checks the KConfig-File before Building and moves the Dependencies which
+are specified inside it to the Build-Directory so the Build-System can use them.
 
 \subsubsection{Device Tree}
 
-\href{https://docs.zephyrproject.org/2.0.0/guides/dts/index.html}
-{The Device Tree} is a way of defining hardware and configuration
-Information for Zephyr-Boards.
+\href{https://www.devicetree.org/}
+{The Device Tree} is a community project and creates an Open-Standard for storing
+hardware and configuration Information inside a ``.dts``-File.
 \\
-It is used so Code can be dynamically included or excluded for
-every Board without hard-coding every device into the OS.
+Zephyr uses it so Code can be dynamically included or excluded for
+every Board without hard-coding every device into the Board.
+\\
+Every Board in Zephyr has an associated ``.dts``-File which then fills in the
+Hardware-Addresses into the imported Libraries.
 \\
 \\
 It removes the need for hardcoded Addresses inside the Libraries and enables
-that Libraries can be reused across a range of different devices with
+the reuse of Libraries across a range of different devices with
 different Hardware.
 
 \pagebreak
@@ -159,14 +191,14 @@ This means the Program had to be developed using non-blocking Calls.
 If the Program is to be implemented on a proper device these can be rewritten easily
 using the equivalent blocking statements.
 
-\subsubsection{Threads}
+\subsection{Threads}
 
 A Thread is a sequence of instruction which can be run
 independent of it's parent-process (the main-Thread in this case).
 \\
 This allows the CPU to work on seperate Jobs simultaneously.
 
-\subsubsection{Message-Queues}
+\subsection{Message-Queues}
 
 Message Queues are FIFO-Buffers (First-In-First-Out-Buffers).
 \\
